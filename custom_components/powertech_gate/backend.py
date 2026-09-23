@@ -411,8 +411,11 @@ def get_devices(access_token: str) -> list[PowertechDevice]:
                     or ""
                 ).strip()
 
-                # Capability-based discovery: UUID + AWS IoT endpoint are required.
-                if not uuid or not endpoint or uuid in seen:
+                # A stable UUID is sufficient for discovery. Some account
+                # responses omit the endpoint; automatic certificate
+                # provisioning supplies the authoritative AWS IoT endpoint.
+                # Post-provisioning passive shadow validation is unchanged.
+                if not uuid or uuid in seen:
                     continue
 
                 device_type = _device_value(

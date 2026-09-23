@@ -1,28 +1,22 @@
-POWERTECH GATE 0.9.3
+POWERTECH GATE v0.9.4 – RELEASE FILES
 
-Másold ennek a mappának a tartalmát a meglévő repository gyökerébe.
-
-Felülírandó:
+Copy the included paths into the ROOT of the existing GitHub repository:
+- custom_components/powertech_gate/backend.py
+- custom_components/powertech_gate/manifest.json
 - README.md
 - CHANGELOG.md
-- custom_components/powertech_gate/api.py
-- custom_components/powertech_gate/manifest.json
 
-Új fájl:
-- RELEASE_NOTES_0.9.3.md
+RELEASE_NOTES_0.9.4.md is intended for the GitHub Release description and may
+optionally be committed to the repository. Do not copy UPLOAD_INSTRUCTIONS.txt
+unless you want to keep it in the repository.
 
-Fontos:
-- A Marek-féle endpoint nélküli discovery teszt NINCS benne ebben a release-ben,
-  mert azt még külön szeretnénk validálni.
-- Ez a release csak a pedestrian close protokolljavítást tartalmazza.
+This package contains CHANGED FILES ONLY. Do NOT delete the other integration
+files already in your existing repository.
 
-Javasolt commit message:
-Release v0.9.3: fix pedestrian close command
+Suggested commit: Release v0.9.4: discover devices without initial IoT endpoint
+Suggested tag: 0.9.4  (no v prefix)
+GitHub Release title: 0.9.4
+Mark as latest release and publish. HACS may need a refresh to show it.
 
-Javasolt tag:
-0.9.3
-
-GitHub Release title:
-0.9.3
-
-A GitHub Release leírásához használd a RELEASE_NOTES_0.9.3.md tartalmát.
+Do not state that Marek's endpoint-less installation is confirmed fixed until
+he has tested the release.

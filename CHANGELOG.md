@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.4
+- Accept device discovery records with a stable UUID even when `iot_endpoint` is absent (reported by Marek for PS20088).
+- Use the AWS IoT endpoint returned during certificate provisioning, as before.
+- Keep certificate/policy provisioning, passive shadow validation, PIN verification and gate commands unchanged.
+- Verified the new discovery path in simulated endpoint-less and endpoint-present tests, and the endpoint-present path on PS20088D reference hardware; the endpoint-less path still needs community hardware confirmation.
+
 ## 0.9.3
 - Fixed Pedestrian gate closing to match the official EyeOpen Android app behavior.
 - Pedestrian opening continues to use `PED OPEN`.

@@ -29,12 +29,12 @@ AWS IoT gate controllers.
 Automatic discovery is capability-based rather than tied to the literal
 `WBT01` name.
 
-A Powertech account device first becomes a candidate when it has:
+A Powertech account device first becomes a candidate when it has a stable UUID.
+An `iot_endpoint` field in the initial device-list record is optional: during
+automatic onboarding, certificate provisioning returns the authoritative AWS
+IoT endpoint. Devices are still subject to passive protocol validation.
 
-- a stable UUID
-- an AWS IoT endpoint
-
-For directly owned devices these fields are returned on the device record.
+For directly owned devices, the UUID is returned on the device record.
 For shared devices, Powertech may return a share wrapper and place the actual
 device record inside the vendor field named `devies_info`. Version 0.9.1 and
 newer understands this nested shared-device format.
@@ -196,9 +196,10 @@ Enable debug logging and look for privacy-safe lines containing:
 Powertech discovery
 ```
 
-A candidate needs a UUID and AWS IoT endpoint. On shared accounts, version
-0.9.1+ also looks inside the nested `devies_info` object returned in
-`share_devices`.
+A candidate needs a stable UUID; `iot_endpoint` is optional in the initial
+device-list response starting in version 0.9.4. The AWS IoT endpoint is still
+required at certificate provisioning. On shared accounts, the integration also
+looks inside the nested `devies_info` object returned in `share_devices`.
 
 ### Pedestrian gate is missing after an update
 
@@ -247,9 +248,13 @@ repository intentionally does not redistribute vendor logo artwork.
 
 ## Development status
 
-`0.9.3` fixes Pedestrian gate closing to match the official EyeOpen Android app:
-`PED OPEN` is used for pedestrian opening, while closing uses the normal
-`FULL CLOSE` command.
+`0.9.4` allows account device discovery when the initial device-list record
+has a stable UUID but no `iot_endpoint`. Automatic onboarding still obtains
+its authoritative endpoint at certificate provisioning; Marek's specific
+endpoint-less hardware case awaits community confirmation.
+
+Version 0.9.3 fixed Pedestrian gate closing to match the official EyeOpen
+Android app: `PED OPEN` opens pedestrian mode and `FULL CLOSE` closes it.
 
 Version 0.9.2 fixed pedestrian-capability detection for PS20040/PS20040D, and
 version 0.9.1 added support for EyeOpen shared/Manager accounts.
