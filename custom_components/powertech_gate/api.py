@@ -435,8 +435,21 @@ class PW200Client:
             return
 
         if msg.topic == self._topic_shadow_err:
+            # AWS IoT shadow/get/rejected normally includes a numeric error
+            # code. Record only that code: the full error response may contain
+            # request metadata and must not be copied into public logs.
+            try:
+                error = json.loads(payload)
+            except json.JSONDecodeError:
+                error = None
+
+            code = error.get("code") if isinstance(error, dict) else None
+            if type(code) is not int:
+                code = None
+
             _LOGGER.warning(
-                "Powertech shadow request rejected"
+                "Powertech shadow request rejected; code=%s",
+                code,
             )
             return
 

@@ -1,22 +1,20 @@
-POWERTECH GATE v0.9.4 – RELEASE FILES
+POWERTECH GATE 0.9.5 — READY TO COPY
 
-Copy the included paths into the ROOT of the existing GitHub repository:
-- custom_components/powertech_gate/backend.py
-- custom_components/powertech_gate/manifest.json
-- README.md
-- CHANGELOG.md
+This is an incremental release package based on the repository's v0.9.4
+backend and v0.9.3 cloud API. It does NOT contain the entire repository.
 
-RELEASE_NOTES_0.9.4.md is intended for the GitHub Release description and may
-optionally be committed to the repository. Do not copy UPLOAD_INSTRUCTIONS.txt
-unless you want to keep it in the repository.
+Copy these files into the existing repository, preserving relative paths:
+  custom_components/powertech_gate/api.py
+  custom_components/powertech_gate/manifest.json
+  CHANGELOG.md
+  README.md
+  RELEASE_NOTES_0.9.5.md (new file; used for the GitHub release)
 
-This package contains CHANGED FILES ONLY. Do NOT delete the other integration
-files already in your existing repository.
+Suggested commit: Release v0.9.5: log AWS shadow rejection codes safely
+Git tag: 0.9.5   (no 'v' prefix)
+GitHub release name: 0.9.5
+GitHub release body: contents of RELEASE_NOTES_0.9.5.md
+Mark the release as Latest, then verify HACS sees 0.9.5.
 
-Suggested commit: Release v0.9.4: discover devices without initial IoT endpoint
-Suggested tag: 0.9.4  (no v prefix)
-GitHub Release title: 0.9.4
-Mark as latest release and publish. HACS may need a refresh to show it.
-
-Do not state that Marek's endpoint-less installation is confirmed fixed until
-he has tested the release.
+This release only improves error-code diagnostics; it does not resolve Marek's
+underlying AWS IoT shadow rejection. No gate movement safety check is bypassed.

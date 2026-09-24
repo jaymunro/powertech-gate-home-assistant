@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.5
+- Add privacy-safe diagnostics for AWS IoT shadow GET rejections during automatic onboarding/reconfigure.
+- Log only the AWS rejection's numeric `code` (or `None` for missing/malformed responses); never log the full rejected response body.
+- Help distinguish possible permission failures from missing-shadow responses while investigating the PS20088 setup problem reported after v0.9.4.
+- Diagnostic update only: no change to discovery, provisioning, gate commands, or passive safety validation.
+
 ## 0.9.4
 - Accept device discovery records with a stable UUID even when `iot_endpoint` is absent (reported by Marek for PS20088).
 - Use the AWS IoT endpoint returned during certificate provisioning, as before.

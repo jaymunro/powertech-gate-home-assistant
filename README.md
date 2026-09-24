@@ -213,10 +213,18 @@ Look for:
 
 ```text
 Powertech candidate validation
+Powertech shadow request rejected; code=...
 ```
 
+In v0.9.5+, the second message logs only the numeric AWS rejection code, or
+`None` when no valid numeric code was returned. For example, a 403 can indicate
+an access-policy problem and a 404 can indicate a missing or unavailable shadow;
+these are diagnostic clues, not confirmed causes for any specific device.
+
 Automatic control requires both `DEV INFO` and `DEV STATUS` from the AWS IoT
-shadow.
+shadow. Do not bypass passive validation to enable gate movement. If reporting
+an issue, share only the relevant sanitized Powertech log lines, not an entire
+Home Assistant log that may contain secrets from other integrations.
 
 ### Gate becomes unavailable
 
@@ -247,6 +255,9 @@ They are used here only to identify compatible products/services. This
 repository intentionally does not redistribute vendor logo artwork.
 
 ## Development status
+
+`0.9.5` adds safe error-code logging when AWS IoT shadow requests are rejected;
+this is a diagnostic release, not yet a fix for the underlying shadow rejection.
 
 `0.9.4` allows account device discovery when the initial device-list record
 has a stable UUID but no `iot_endpoint`. Automatic onboarding still obtains
