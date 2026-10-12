@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.6
+- Wait for AWS IoT subscription acknowledgements for both shadow GET response topics before sending the initial shadow request.
+- Retry unanswered shadow GET requests within the existing 12-second passive validation window.
+- Add privacy-safe logging for MQTT subscription requests, SUBACK outcomes, shadow GET attempts and validation timeouts.
+- Preserve all existing gate movement commands, PIN handling and post-provisioning safety validation.
+- Diagnostic/reliability release: does not guarantee compatibility for devices that never expose the required DEV INFO / DEV STATUS shadow fields.
+
 ## 0.9.5
 - Add privacy-safe diagnostics for AWS IoT shadow GET rejections during automatic onboarding/reconfigure.
 - Log only the AWS rejection's numeric `code` (or `None` for missing/malformed responses); never log the full rejected response body.

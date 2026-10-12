@@ -1,20 +1,20 @@
-POWERTECH GATE 0.9.5 — READY TO COPY
+Powertech Gate 0.9.6 - release files
 
-This is an incremental release package based on the repository's v0.9.4
-backend and v0.9.3 cloud API. It does NOT contain the entire repository.
+The ZIP contains ONLY changed files. Copy them into their matching locations in
+the existing GitHub repository; keep all other integration files unchanged.
 
-Copy these files into the existing repository, preserving relative paths:
+Changed files:
   custom_components/powertech_gate/api.py
   custom_components/powertech_gate/manifest.json
   CHANGELOG.md
   README.md
-  RELEASE_NOTES_0.9.5.md (new file; used for the GitHub release)
+Added:
+  tests/test_shadow_diagnostics_096.py
+  RELEASE_NOTES_0.9.6.md (for GitHub Release description; optional in repo)
 
-Suggested commit: Release v0.9.5: log AWS shadow rejection codes safely
-Git tag: 0.9.5   (no 'v' prefix)
-GitHub release name: 0.9.5
-GitHub release body: contents of RELEASE_NOTES_0.9.5.md
-Mark the release as Latest, then verify HACS sees 0.9.5.
+Commit: Release 0.9.6: wait for MQTT shadow SUBACK and add bounded retries
+Git tag: 0.9.6 (no v prefix)
+GitHub release title: 0.9.6 - AWS shadow diagnostics and retry
+Use RELEASE_NOTES_0.9.6.md as the release description.
 
-This release only improves error-code diagnostics; it does not resolve Marek's
-underlying AWS IoT shadow rejection. No gate movement safety check is bypassed.
+Live confirmation is still pending on Marek's endpoint-less PS20088 setup.

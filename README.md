@@ -254,15 +254,34 @@ Powertech and EyeOpen names may be trademarks of their respective owners.
 They are used here only to identify compatible products/services. This
 repository intentionally does not redistribute vendor logo artwork.
 
+## AWS shadow diagnostics (0.9.6)
+
+On MQTT connection, the integration now waits for AWS IoT to acknowledge the
+`shadow/get/accepted` and `shadow/get/rejected` subscriptions before requesting
+the shadow. During initial setup it retries unanswered requests within the
+existing 12-second validation window.
+
+For setup failures, enable the `custom_components.powertech_gate` DEBUG logger.
+Look for `subscription acknowledged`, `shadow GET queued` and
+`shadow validation timed out` messages. Logs include only topic *categories*,
+boolean status flags and counters; do not post unredacted logs from other
+integrations. The release does **not** bypass protocol validation or send
+gate movement commands during setup.
+
 ## Development status
+
+`0.9.6` waits for shadow-response SUBACKs, retries unanswered shadow GETs
+within the existing validation window, and logs privacy-safe connection
+statistics for further community testing.
 
 `0.9.5` adds safe error-code logging when AWS IoT shadow requests are rejected;
 this is a diagnostic release, not yet a fix for the underlying shadow rejection.
 
 `0.9.4` allows account device discovery when the initial device-list record
 has a stable UUID but no `iot_endpoint`. Automatic onboarding still obtains
-its authoritative endpoint at certificate provisioning; Marek's specific
-endpoint-less hardware case awaits community confirmation.
+its authoritative endpoint at certificate provisioning. Community testing
+confirmed that 0.9.4 resolves the original discovery issue for PS20088,
+although shadow validation still needs investigation.
 
 Version 0.9.3 fixed Pedestrian gate closing to match the official EyeOpen
 Android app: `PED OPEN` opens pedestrian mode and `FULL CLOSE` closes it.

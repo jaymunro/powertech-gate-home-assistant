@@ -76,6 +76,19 @@ class PW200Client:
         self._listeners: set[Callable[[], None]] = set()
         self._connected = threading.Event()
         self._last_disconnect_reason: str | None = None
+
+        # AWS shadow GET is safe only after both response subscriptions are
+        # acknowledged. These flags/counters contain no sensitive payloads.
+        self._shadow_subscribed = threading.Event()
+        self._shadow_subscription_status: dict[str, bool] = {}
+        self._pending_subscriptions: dict[int, str] = {}
+        self._shadow_lock = threading.Lock()
+        self._shadow_get_requests = 0
+        self._shadow_get_accepted = 0
+        self._shadow_get_rejected = 0
+        self._last_shadow_get_at = 0.0
+        self._shadow_publish_failures = 0
+
         # Transient only; never persisted or logged.
         self._decoded_pin: str | None = None
 
@@ -102,6 +115,7 @@ class PW200Client:
         )
         self._mqtt.on_connect = self._on_connect
         self._mqtt.on_disconnect = self._on_disconnect
+        self._mqtt.on_subscribe = self._on_subscribe
         self._mqtt.on_message = self._on_message
         self._mqtt.reconnect_delay_set(min_delay=1, max_delay=60)
 
@@ -214,51 +228,114 @@ class PW200Client:
         finally:
             self._mqtt.loop_stop()
 
-    def request_shadow(self) -> None:
-        """Request the current AWS IoT shadow."""
-        self._mqtt.publish(
-            self._topic_shadow_get,
-            "{}",
-            qos=0,
+    # Keep retries inside the existing 12-second validation window; no gate
+    # movement commands are sent during this process.
+    SHADOW_RETRY_INTERVAL_SECONDS = 3.0
+
+    def request_shadow(self) -> bool:
+        """Request shadow only after MQTT confirms response subscriptions.
+
+        Returns whether MQTT accepted the publish request (not whether AWS
+        delivered a shadow). The payload is fixed and contains no identifiers.
+        """
+        if not self.is_connected or not self._shadow_subscribed.is_set():
+            _LOGGER.debug(
+                "Powertech shadow GET deferred; mqtt_connected=%s "
+                "subscriptions_ready=%s",
+                self.is_connected,
+                self._shadow_subscribed.is_set(),
+            )
+            return False
+
+        with self._shadow_lock:
+            # Set before publish: the callback could receive the response
+            # immediately on a different thread.
+            self._last_shadow_get_at = time.monotonic()
+            self._shadow_get_requests += 1
+            request_number = self._shadow_get_requests
+
+        info = self._mqtt.publish(self._topic_shadow_get, "{}", qos=0)
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+            with self._shadow_lock:
+                self._shadow_publish_failures += 1
+            _LOGGER.warning(
+                "Powertech shadow GET publish failed; rc=%s",
+                info.rc,
+            )
+            return False
+
+        _LOGGER.debug(
+            "Powertech shadow GET queued; attempt=%d", request_number
         )
+        return True
 
     def wait_for_shadow_capabilities(
         self,
         timeout: float = 12.0,
     ) -> tuple[bool, dict[str, bool]]:
-        """Passively validate the Powertech AWS/WBT shadow schema.
+        """Passively validate AWS/WBT shadow and retry missed GETs safely.
 
-        This sends only the AWS shadow GET request. It never sends a gate
-        movement command.
+        No OPEN, CLOSE, STOP or pedestrian commands are sent here.
         """
         deadline = time.monotonic() + timeout
-        requested = False
 
         while time.monotonic() < deadline:
-            if self.is_connected and not requested:
-                self.request_shadow()
-                requested = True
-
             state = self.state
-            has_dev_info = bool(state.device_info)
-            has_dev_status = bool(state.raw_status)
-            if has_dev_info and has_dev_status:
-                return True, {
-                    "dev_info": True,
-                    "dev_status": True,
-                    "wbt_version": bool(state.wbt_version),
-                    "uart_version": state.uart_version is not None,
-                    "pin_verification": self._decoded_pin is not None,
-                }
+            if state.device_info and state.raw_status:
+                return True, self._shadow_capabilities()
+
+            if self._shadow_subscribed.is_set():
+                with self._shadow_lock:
+                    last_request = self._last_shadow_get_at
+
+                if (
+                    not last_request
+                    or time.monotonic() - last_request
+                    >= self.SHADOW_RETRY_INTERVAL_SECONDS
+                ):
+                    self.request_shadow()
 
             time.sleep(0.1)
 
-        state = self.state
-        return False, {
-            "dev_info": bool(state.device_info),
-            "dev_status": bool(state.raw_status),
-            "wbt_version": bool(state.wbt_version),
-            "uart_version": state.uart_version is not None,
+        with self._shadow_lock:
+            attempts = self._shadow_get_requests
+            accepted = self._shadow_get_accepted
+            rejected = self._shadow_get_rejected
+            publish_failures = self._shadow_publish_failures
+            confirmed = sorted(
+                topic
+                for topic, ok in self._shadow_subscription_status.items()
+                if ok
+            )
+            failed = sorted(
+                topic
+                for topic, ok in self._shadow_subscription_status.items()
+                if not ok
+            )
+
+        _LOGGER.warning(
+            "Powertech shadow validation timed out; mqtt_connected=%s "
+            "subscriptions_ready=%s confirmed=%s failed=%s "
+            "get_attempts=%d get_accepted=%d get_rejected=%d "
+            "publish_failures=%d",
+            self.is_connected,
+            self._shadow_subscribed.is_set(),
+            confirmed,
+            failed,
+            attempts,
+            accepted,
+            rejected,
+            publish_failures,
+        )
+        return False, self._shadow_capabilities()
+
+    def _shadow_capabilities(self) -> dict[str, bool]:
+        """Return only boolean capability indicators for diagnostics."""
+        return {
+            "dev_info": bool(self.state.device_info),
+            "dev_status": bool(self.state.raw_status),
+            "wbt_version": bool(self.state.wbt_version),
+            "uart_version": self.state.uart_version is not None,
             "pin_verification": self._decoded_pin is not None,
         }
 
@@ -340,32 +417,87 @@ class PW200Client:
         if reason_code.is_failure:
             return
 
+        # Reconnects start with a new set of SUBACKs. Avoid accepting an
+        # earlier connection's subscription readiness.
+        self._shadow_subscribed.clear()
+        with self._shadow_lock:
+            self._pending_subscriptions.clear()
+            self._shadow_subscription_status.clear()
+            self._last_shadow_get_at = 0.0
+
         self._connected.set()
         self._last_disconnect_reason = None
         self._notify()
 
-        client.subscribe(
-            self._topic_shadow_ok,
-            qos=0,
+        topics = (
+            ("shadow_accepted", self._topic_shadow_ok),
+            ("shadow_rejected", self._topic_shadow_err),
+            ("shadow_updated", self._topic_shadow_update),
+            ("position", self._topic_position),
+            ("command_ack", self._topic_cmd_tx),
         )
-        client.subscribe(
-            self._topic_shadow_err,
-            qos=0,
-        )
-        client.subscribe(
-            self._topic_shadow_update,
-            qos=0,
-        )
-        client.subscribe(
-            self._topic_position,
-            qos=0,
-        )
-        client.subscribe(
-            self._topic_cmd_tx,
-            qos=0,
-        )
+        for name, topic in topics:
+            rc, mid = client.subscribe(topic, qos=0)
+            if rc != mqtt.MQTT_ERR_SUCCESS:
+                with self._shadow_lock:
+                    self._shadow_subscription_status[name] = False
+                _LOGGER.warning(
+                    "Powertech MQTT subscribe request failed; "
+                    "topic_kind=%s rc=%s", name, rc,
+                )
+            else:
+                with self._shadow_lock:
+                    self._pending_subscriptions[mid] = name
+                _LOGGER.debug(
+                    "Powertech MQTT subscription requested; topic_kind=%s",
+                    name,
+                )
+        # Do not request the shadow yet: wait for both GET response SUBACKs.
 
-        self.request_shadow()
+    def _on_subscribe(
+        self,
+        client,
+        userdata,
+        mid,
+        reason_code_list,
+        properties=None,
+    ) -> None:
+        """Confirm AWS subscription readiness before the first shadow GET."""
+        with self._shadow_lock:
+            name = self._pending_subscriptions.pop(mid, None)
+        if name is None:
+            _LOGGER.debug("Powertech MQTT received untracked SUBACK")
+            return
+
+        accepted = bool(reason_code_list) and all(
+            not (
+                reason.is_failure
+                if hasattr(reason, "is_failure")
+                else int(reason) >= 128
+            )
+            for reason in reason_code_list
+        )
+        with self._shadow_lock:
+            self._shadow_subscription_status[name] = accepted
+            ready = (
+                self._shadow_subscription_status.get("shadow_accepted") is True
+                and self._shadow_subscription_status.get("shadow_rejected") is True
+            )
+
+        _LOGGER.debug(
+            "Powertech MQTT subscription acknowledged; "
+            "topic_kind=%s accepted=%s", name, accepted,
+        )
+        if not accepted:
+            _LOGGER.warning(
+                "Powertech MQTT subscription rejected; topic_kind=%s",
+                name,
+            )
+
+        if ready and not self._shadow_subscribed.is_set():
+            self._shadow_subscribed.set()
+            _LOGGER.debug("Powertech MQTT shadow response subscriptions ready")
+            self.request_shadow()
 
     def _on_disconnect(
         self,
@@ -380,6 +512,7 @@ class PW200Client:
             reason_code,
         )
         self._connected.clear()
+        self._shadow_subscribed.clear()
         self._last_disconnect_reason = str(reason_code)
         self.state = replace(self.state, online=False)
         self._notify()
@@ -435,6 +568,8 @@ class PW200Client:
             return
 
         if msg.topic == self._topic_shadow_err:
+            with self._shadow_lock:
+                self._shadow_get_rejected += 1
             # AWS IoT shadow/get/rejected normally includes a numeric error
             # code. Record only that code: the full error response may contain
             # request metadata and must not be copied into public logs.
@@ -458,6 +593,11 @@ class PW200Client:
             self._topic_shadow_update,
         ):
             return
+
+        if msg.topic == self._topic_shadow_ok:
+            with self._shadow_lock:
+                self._shadow_get_accepted += 1
+            _LOGGER.debug("Powertech shadow GET accepted")
 
         try:
             data = json.loads(payload)
