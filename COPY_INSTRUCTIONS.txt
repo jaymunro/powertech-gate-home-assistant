@@ -1,0 +1,19 @@
+Powertech Gate 0.9.7 – ready-to-copy diagnostic release
+
+Changed files:
+- custom_components/powertech_gate/backend.py
+- custom_components/powertech_gate/manifest.json
+- CHANGELOG.md
+- README_0.9.7_ADDITION.md
+
+Purpose:
+Diagnose Marek's AWS shadow 404 by fingerprinting possible alternate Thing/client/device identifiers without logging raw identifiers.
+
+Important:
+0.9.7 does NOT automatically use alternate Thing IDs and does NOT bypass protocol validation.
+
+Suggested commit:
+Release 0.9.7: add privacy-safe AWS Thing identifier diagnostics
+
+Suggested tag:
+0.9.7

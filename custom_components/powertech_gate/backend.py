@@ -115,9 +115,6 @@ def _request(
         except json.JSONDecodeError:
             pass
 
-        # Do not propagate backend response bodies into Home Assistant
-        # exceptions/logs. Error bodies are outside our control and may contain
-        # account/device metadata or echoed request data.
         if err.code in (401, 403):
             raise InvalidAuth("Powertech authentication failed") from err
 
@@ -160,6 +157,61 @@ def _fingerprint(value: object) -> str | None:
     ).hexdigest()[:10]
 
 
+def _identifier_candidates_for_debug(item: dict) -> list[dict[str, object]]:
+    """Return privacy-safe fingerprints for possible AWS Thing identifiers.
+
+    The vendor API schema varies across accounts/models. We only inspect a
+    conservative allow-list of identifier-like field names and never log the
+    raw values.
+    """
+    if not isinstance(item, dict):
+        return []
+
+    key_aliases = (
+        "thing",
+        "thing_name",
+        "thingName",
+        "thing_id",
+        "thingId",
+        "aws_thing",
+        "awsThing",
+        "aws_thing_name",
+        "awsThingName",
+        "iot_thing",
+        "iotThing",
+        "iot_thing_name",
+        "iotThingName",
+        "client_id",
+        "clientId",
+        "device_id",
+        "deviceId",
+    )
+    uuid_value = (
+        item.get("uuid")
+        or item.get("UID")
+        or item.get("uid")
+        or item.get("device_uuid")
+    )
+    uuid_fp = _fingerprint(uuid_value)
+
+    result: list[dict[str, object]] = []
+    for key in key_aliases:
+        value = item.get(key)
+        if value in (None, "") or isinstance(value, (dict, list)):
+            continue
+        fingerprint = _fingerprint(value)
+        result.append(
+            {
+                "field": key,
+                "fingerprint": fingerprint,
+                "matches_uuid": bool(
+                    uuid_fp is not None and fingerprint == uuid_fp
+                ),
+            }
+        )
+    return result
+
+
 def _decode_embedded_device_info(value):
     """Return devies_info as a Python object when the backend embeds JSON."""
     if isinstance(value, (dict, list)):
@@ -196,9 +248,6 @@ def _iter_candidate_device_items(item: dict):
         return
 
     yield item
-
-    # Shared devices are returned as a share wrapper. The actual AWS IoT
-    # device record is nested in the vendor's misspelled `devies_info` field.
     yield from _iter_nested_device_items(item.get("devies_info"))
 
 
@@ -211,6 +260,9 @@ def _redact_device_for_debug(item: dict) -> dict:
     if isinstance(embedded, dict):
         embedded_keys = sorted(embedded.keys())
         embedded_items = 1
+        embedded_identifier_candidates = _identifier_candidates_for_debug(
+            embedded
+        )
     elif isinstance(embedded, list):
         embedded_keys = sorted(
             {
@@ -221,9 +273,19 @@ def _redact_device_for_debug(item: dict) -> dict:
             }
         )
         embedded_items = sum(isinstance(child, dict) for child in embedded)
+        embedded_identifier_candidates = [
+            {
+                "item": index,
+                "identifiers": identifiers,
+            }
+            for index, child in enumerate(embedded)
+            if isinstance(child, dict)
+            and (identifiers := _identifier_candidates_for_debug(child))
+        ]
     else:
         embedded_keys = None
         embedded_items = 0
+        embedded_identifier_candidates = []
 
     return {
         "keys": sorted(item.keys()),
@@ -233,6 +295,7 @@ def _redact_device_for_debug(item: dict) -> dict:
             or item.get("uid")
             or item.get("device_uuid")
         ),
+        "identifier_candidates": _identifier_candidates_for_debug(item),
         "uuid_type": (
             item.get("uuid_type")
             or item.get("uuidType")
@@ -276,6 +339,7 @@ def _redact_device_for_debug(item: dict) -> dict:
         ),
         "devies_info_items": embedded_items,
         "devies_info_keys": embedded_keys,
+        "devies_info_identifier_candidates": embedded_identifier_candidates,
     }
 
 
@@ -411,10 +475,6 @@ def get_devices(access_token: str) -> list[PowertechDevice]:
                     or ""
                 ).strip()
 
-                # A stable UUID is sufficient for discovery. Some account
-                # responses omit the endpoint; automatic certificate
-                # provisioning supplies the authoritative AWS IoT endpoint.
-                # Post-provisioning passive shadow validation is unchanged.
                 if not uuid or uuid in seen:
                     continue
 
@@ -439,8 +499,6 @@ def get_devices(access_token: str) -> list[PowertechDevice]:
 
                 friendly_name = custom_names.get(uuid)
                 if not friendly_name and bucket == "share_devices":
-                    # Prefer the share's user-visible name when custom_info
-                    # does not contain a name for this shared device.
                     share_name = (
                         raw_item.get("custom_group_name")
                         or raw_item.get("custom_user_display_name")
@@ -459,6 +517,13 @@ def get_devices(access_token: str) -> list[PowertechDevice]:
                     normalized_device_type in KNOWN_PEDESTRIAN_MODELS
                 )
                 experimental_model = not pedestrian_supported
+
+                _LOGGER.debug(
+                    "Powertech selected AWS Thing identifier source=uuid "
+                    "fingerprint=%s alternative_identifier_candidates=%s",
+                    _fingerprint(uuid),
+                    _identifier_candidates_for_debug(item),
+                )
 
                 devices.append(
                     PowertechDevice(
@@ -638,7 +703,6 @@ def provision(
         private_key,
     ) = create_user_certificate(access_token)
 
-    # The endpoint returned with the new certificate is authoritative.
     endpoint = certificate_endpoint or device.endpoint
 
     attach_policy(
