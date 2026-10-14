@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -89,6 +90,17 @@ class PW200Client:
         self._last_shadow_get_at = 0.0
         self._shadow_publish_failures = 0
 
+        # Passive MQTT diagnostics used only to determine whether affected
+        # devices publish state outside the default AWS IoT shadow. Payloads
+        # and raw unknown topic names are never logged.
+        self._passive_topic_counts: dict[str, int] = {
+            "position": 0,
+            "command_ack": 0,
+            "unknown_device_topic": 0,
+            "named_shadow_update": 0,
+        }
+        self._unknown_topic_fingerprints: set[str] = set()
+
         # Transient only; never persisted or logged.
         self._decoded_pin: str | None = None
 
@@ -107,6 +119,14 @@ class PW200Client:
         self._topic_position = f"{thing_id}/position"
         self._topic_cmd_rx = f"{thing_id}/wbt01Rx"
         self._topic_cmd_tx = f"{thing_id}/wbt01Tx"
+
+        # Passive diagnostics only. These subscriptions never publish or move
+        # the gate. AWS may reject them if the vendor policy is more restrictive;
+        # that SUBACK result is itself useful diagnostic information.
+        self._topic_device_wildcard = f"{thing_id}/#"
+        self._topic_named_shadow_updates = (
+            f"$aws/things/{thing_id}/shadow/name/+/update/#"
+        )
 
         self._mqtt = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
@@ -302,6 +322,10 @@ class PW200Client:
             accepted = self._shadow_get_accepted
             rejected = self._shadow_get_rejected
             publish_failures = self._shadow_publish_failures
+            passive_topic_counts = dict(self._passive_topic_counts)
+            unknown_topic_fingerprints = sorted(
+                self._unknown_topic_fingerprints
+            )
             confirmed = sorted(
                 topic
                 for topic, ok in self._shadow_subscription_status.items()
@@ -317,7 +341,8 @@ class PW200Client:
             "Powertech shadow validation timed out; mqtt_connected=%s "
             "subscriptions_ready=%s confirmed=%s failed=%s "
             "get_attempts=%d get_accepted=%d get_rejected=%d "
-            "publish_failures=%d",
+            "publish_failures=%d passive_topic_counts=%s "
+            "unknown_topic_fingerprints=%s",
             self.is_connected,
             self._shadow_subscribed.is_set(),
             confirmed,
@@ -326,6 +351,8 @@ class PW200Client:
             accepted,
             rejected,
             publish_failures,
+            passive_topic_counts,
+            unknown_topic_fingerprints,
         )
         return False, self._shadow_capabilities()
 
@@ -338,6 +365,47 @@ class PW200Client:
             "uart_version": self.state.uart_version is not None,
             "pin_verification": self._decoded_pin is not None,
         }
+
+    def _record_passive_topic(self, topic: str) -> None:
+        """Record topic activity without logging payloads or raw unknown topics."""
+        kind: str | None = None
+        fingerprint: str | None = None
+
+        if topic == self._topic_position:
+            kind = "position"
+        elif topic == self._topic_cmd_tx:
+            kind = "command_ack"
+        elif topic.startswith(f"{self.thing_id}/"):
+            kind = "unknown_device_topic"
+            suffix = topic[len(self.thing_id) + 1 :]
+            fingerprint = hashlib.sha256(
+                suffix.encode("utf-8")
+            ).hexdigest()[:10]
+        elif topic.startswith(f"$aws/things/{self.thing_id}/shadow/name/"):
+            kind = "named_shadow_update"
+            suffix = topic.split("/shadow/name/", 1)[1]
+            fingerprint = hashlib.sha256(
+                suffix.encode("utf-8")
+            ).hexdigest()[:10]
+
+        if kind is None:
+            return
+
+        with self._shadow_lock:
+            self._passive_topic_counts[kind] = (
+                self._passive_topic_counts.get(kind, 0) + 1
+            )
+            count = self._passive_topic_counts[kind]
+            if fingerprint is not None:
+                self._unknown_topic_fingerprints.add(fingerprint)
+
+        _LOGGER.debug(
+            "Powertech passive MQTT activity; topic_kind=%s count=%d "
+            "topic_fingerprint=%s",
+            kind,
+            count,
+            fingerprint,
+        )
 
     def open_gate(self) -> None:
         self._publish_command("FULL OPEN")
@@ -424,6 +492,13 @@ class PW200Client:
             self._pending_subscriptions.clear()
             self._shadow_subscription_status.clear()
             self._last_shadow_get_at = 0.0
+            self._passive_topic_counts = {
+                "position": 0,
+                "command_ack": 0,
+                "unknown_device_topic": 0,
+                "named_shadow_update": 0,
+            }
+            self._unknown_topic_fingerprints.clear()
 
         self._connected.set()
         self._last_disconnect_reason = None
@@ -435,6 +510,8 @@ class PW200Client:
             ("shadow_updated", self._topic_shadow_update),
             ("position", self._topic_position),
             ("command_ack", self._topic_cmd_tx),
+            ("device_wildcard", self._topic_device_wildcard),
+            ("named_shadow_updates", self._topic_named_shadow_updates),
         )
         for name, topic in topics:
             rc, mid = client.subscribe(topic, qos=0)
@@ -523,15 +600,16 @@ class PW200Client:
         userdata,
         msg,
     ) -> None:
+        self._record_passive_topic(msg.topic)
+
         payload = msg.payload.decode(
             "utf-8",
             errors="replace",
         )
 
         if msg.topic == self._topic_cmd_tx:
-            _LOGGER.info(
-                "Powertech RX: %s",
-                payload,
+            _LOGGER.debug(
+                "Powertech MQTT command-ack message received"
             )
             self.state = replace(
                 self.state,

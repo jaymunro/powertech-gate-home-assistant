@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.8
+- Add passive MQTT topic diagnostics for devices whose default AWS IoT shadow consistently returns `404`.
+- Subscribe to the existing thing-scoped MQTT namespace and named-shadow update namespace without sending gate movement commands.
+- Record only topic categories, counts, SUBACK results, and short non-reversible fingerprints for unknown topic suffixes.
+- Never log payloads from newly observed topics; command-ack payload logging is also removed.
+- Keep `DEV INFO` / `DEV STATUS` shadow validation unchanged. Passive topic activity does not enable gate control by itself.
+- Diagnostic release intended to determine whether affected controllers report state outside the default AWS IoT shadow.
+
 ## 0.9.7
 - Add privacy-safe discovery diagnostics for possible alternate AWS IoT Thing identifiers.
 - Fingerprint only a conservative allow-list of identifier-like backend fields such as Thing/client/device IDs; raw values are never logged.
