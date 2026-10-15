@@ -22,6 +22,14 @@ from .const import BACKEND_BASE_URL, BACKEND_REST_TOKEN, KNOWN_PEDESTRIAN_MODELS
 
 _LOGGER = logging.getLogger(__name__)
 
+# The official EyeOpen Android WBT01 client hard-codes this endpoint for the
+# Powertech WBT fleet before user-certificate/policy setup. 0.9.9 does not
+# force this endpoint; it only compares the backend certificate endpoint to it.
+OFFICIAL_WBT_AWS_ENDPOINT = (
+    "a1acnzxd6t4jcn-ats.iot.eu-central-1.amazonaws.com"
+)
+
+
 
 class PowertechBackendError(Exception):
     """Base Powertech backend exception."""
@@ -146,6 +154,20 @@ def login(username: str, password: str) -> str:
         raise InvalidAuth("No access_token in login response")
 
     return str(access_token)
+
+
+def _endpoint_region(endpoint: object) -> str | None:
+    """Extract only the AWS region label from an IoT endpoint for diagnostics."""
+    if not isinstance(endpoint, str):
+        return None
+    marker = ".iot."
+    suffix = ".amazonaws.com"
+    if marker not in endpoint or not endpoint.endswith(suffix):
+        return None
+    try:
+        return endpoint.split(marker, 1)[1].removesuffix(suffix) or None
+    except (AttributeError, IndexError):
+        return None
 
 
 def _fingerprint(value: object) -> str | None:
@@ -621,8 +643,16 @@ def create_user_certificate(
             f"Received fields: {safe_keys}"
         )
 
+    endpoint_text = str(endpoint)
+    _LOGGER.warning(
+        "Powertech AWS endpoint diagnostic; "
+        "certificate_endpoint_matches_official=%s certificate_region=%s",
+        endpoint_text == OFFICIAL_WBT_AWS_ENDPOINT,
+        _endpoint_region(endpoint_text),
+    )
+
     return (
-        str(endpoint),
+        endpoint_text,
         str(certificate_arn),
         str(certificate_pem),
         str(private_key),
@@ -704,6 +734,24 @@ def provision(
     ) = create_user_certificate(access_token)
 
     endpoint = certificate_endpoint or device.endpoint
+
+    _LOGGER.debug(
+        "Powertech AWS endpoint source diagnostic; "
+        "discovery_endpoint_present=%s "
+        "discovery_endpoint_matches_official=%s "
+        "certificate_matches_discovery=%s",
+        bool(device.endpoint),
+        (
+            device.endpoint == OFFICIAL_WBT_AWS_ENDPOINT
+            if device.endpoint
+            else None
+        ),
+        (
+            certificate_endpoint == device.endpoint
+            if device.endpoint
+            else None
+        ),
+    )
 
     attach_policy(
         access_token,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.9
+- Remove the broad MQTT wildcard subscriptions introduced in 0.9.8 after community testing showed they could disrupt the AWS IoT session before normal shadow validation completed.
+- Restore the known-good 0.9.7 MQTT subscription behavior.
+- Add privacy-safe diagnostics comparing the user-certificate AWS IoT endpoint with the endpoint hard-coded by the official EyeOpen WBT01 client.
+- Log only boolean comparison results and the AWS region label; raw endpoints, certificates and credentials are not logged.
+- Keep certificate provisioning, policy attachment, Thing UUID selection and `DEV INFO` / `DEV STATUS` safety validation unchanged.
+- Diagnostic release for investigating persistent default-shadow `404` responses on some PS20088 accounts.
+
 ## 0.9.8
 - Add passive MQTT topic diagnostics for devices whose default AWS IoT shadow consistently returns `404`.
 - Subscribe to the existing thing-scoped MQTT namespace and named-shadow update namespace without sending gate movement commands.
