@@ -1,4 +1,4 @@
-Powertech Gate 0.9.10 – ready-to-copy diagnostic release
+Powertech Gate 0.9.11 – ready-to-copy diagnostic release
 
 Replace:
 - custom_components/powertech_gate/api.py
@@ -6,17 +6,11 @@ Replace:
 - custom_components/powertech_gate/manifest.json
 - CHANGELOG.md
 
-Optional documentation:
-- README_0.9.10_ADDITION.md
-
-GitHub release text:
-- RELEASE_NOTES_0.9.10.md
-
-Suggested commit:
-Release 0.9.10: add read-only WBT system-status diagnostic
-
 Suggested tag:
-0.9.10
+0.9.11
 
 Suggested release title:
-0.9.10 – Read-only WBT system-status diagnostic
+0.9.11 – Passive EyeOpen MQTT observation
+
+GitHub release text:
+RELEASE_NOTES_0.9.11.md

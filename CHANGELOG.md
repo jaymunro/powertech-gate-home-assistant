@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.11
+- Add a 30-second passive MQTT observation window during candidate validation.
+- Disable the active `RS` diagnostic request for this test.
+- Observe only the already-authorized `wbt01Tx` and `position` topics plus normal shadow topics.
+- Count observed messages without logging raw payloads in the new passive diagnostic lines.
+- Intended test: start setup, then operate the same gate once from the official EyeOpen app during the observation window.
+- Keep all existing protocol and safety validation unchanged.
+
 ## 0.9.10
 - Add a single read-only `RS` system-status diagnostic after the default AWS IoT shadow has returned `404`.
 - Match the official EyeOpen WBT01 command format: `c=RS;src=<source_id>` on `<thing>/wbt01Rx`, with the response expected on `<thing>/wbt01Tx`.

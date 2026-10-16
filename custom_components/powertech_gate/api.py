@@ -96,6 +96,8 @@ class PW200Client:
         self._system_status_ack_received = False
         self._system_status_ack_format_valid = False
         self._system_status_publish_failures = 0
+        self._passive_command_ack_messages = 0
+        self._passive_position_messages = 0
 
         # Transient only; never persisted or logged.
         self._decoded_pin: str | None = None
@@ -285,7 +287,13 @@ class PW200Client:
 
         No OPEN, CLOSE, STOP or pedestrian commands are sent here.
         """
+        timeout = max(timeout, 30.0)
         deadline = time.monotonic() + timeout
+        _LOGGER.warning(
+            "Powertech passive MQTT observation window started; "
+            "duration_seconds=%d",
+            int(timeout),
+        )
 
         while time.monotonic() < deadline:
             state = self.state
@@ -304,8 +312,8 @@ class PW200Client:
                 ):
                     self.request_shadow()
 
-                if rejected_count > 0:
-                    self.request_system_status_diagnostic()
+                # 0.9.11 is intentionally passive after a shadow 404.
+                _ = rejected_count
 
             time.sleep(0.1)
 
@@ -321,6 +329,12 @@ class PW200Client:
             )
             system_status_publish_failures = (
                 self._system_status_publish_failures
+            )
+            passive_command_ack_messages = (
+                self._passive_command_ack_messages
+            )
+            passive_position_messages = (
+                self._passive_position_messages
             )
             confirmed = sorted(
                 topic
@@ -338,7 +352,9 @@ class PW200Client:
             "subscriptions_ready=%s confirmed=%s failed=%s "
             "get_attempts=%d get_accepted=%d get_rejected=%d "
             "publish_failures=%d rs_requested=%s rs_ack_received=%s "
-            "rs_ack_format_valid=%s rs_publish_failures=%d",
+            "rs_ack_format_valid=%s rs_publish_failures=%d "
+            "passive_command_ack_messages=%d "
+            "passive_position_messages=%d",
             self.is_connected,
             self._shadow_subscribed.is_set(),
             confirmed,
@@ -351,6 +367,8 @@ class PW200Client:
             system_status_ack_received,
             system_status_ack_format_valid,
             system_status_publish_failures,
+            passive_command_ack_messages,
+            passive_position_messages,
         )
         return False, self._shadow_capabilities()
 
@@ -494,6 +512,8 @@ class PW200Client:
             self._system_status_ack_received = False
             self._system_status_ack_format_valid = False
             self._system_status_publish_failures = 0
+            self._passive_command_ack_messages = 0
+            self._passive_position_messages = 0
 
         self._connected.set()
         self._last_disconnect_reason = None
@@ -599,6 +619,15 @@ class PW200Client:
         )
 
         if msg.topic == self._topic_cmd_tx:
+            with self._shadow_lock:
+                self._passive_command_ack_messages += 1
+                command_ack_count = self._passive_command_ack_messages
+            _LOGGER.warning(
+                "Powertech passive MQTT activity observed; "
+                "topic_kind=command_ack count=%d",
+                command_ack_count,
+            )
+
             if payload.startswith("ACK RS:"):
                 raw_status = payload.split(":", 1)[1].strip()
                 parts = raw_status.split(",")
@@ -636,6 +665,15 @@ class PW200Client:
             return
 
         if msg.topic == self._topic_position:
+            with self._shadow_lock:
+                self._passive_position_messages += 1
+                position_count = self._passive_position_messages
+            _LOGGER.warning(
+                "Powertech passive MQTT activity observed; "
+                "topic_kind=position count=%d",
+                position_count,
+            )
+
             try:
                 position = max(
                     0,
