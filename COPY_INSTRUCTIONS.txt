@@ -1,4 +1,4 @@
-Powertech Gate 0.9.11 – ready-to-copy diagnostic release
+Powertech Gate 0.9.12 – ready-to-copy diagnostic release
 
 Replace:
 - custom_components/powertech_gate/api.py
@@ -6,11 +6,14 @@ Replace:
 - custom_components/powertech_gate/manifest.json
 - CHANGELOG.md
 
+Suggested commit:
+Release 0.9.12: make passive MQTT observation reconnect-safe
+
 Suggested tag:
-0.9.11
+0.9.12
 
 Suggested release title:
-0.9.11 – Passive EyeOpen MQTT observation
+0.9.12 – Reconnect-safe passive MQTT observation
 
 GitHub release text:
-RELEASE_NOTES_0.9.11.md
+RELEASE_NOTES_0.9.12.md

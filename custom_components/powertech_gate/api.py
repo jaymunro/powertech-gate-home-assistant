@@ -99,6 +99,14 @@ class PW200Client:
         self._passive_command_ack_messages = 0
         self._passive_position_messages = 0
 
+        # Validation-session MQTT lifecycle diagnostics. These counters are
+        # deliberately preserved across reconnects.
+        self._successful_connects = 0
+        self._disconnect_events = 0
+        self._manual_reconnect_attempts = 0
+        self._manual_reconnect_failures = 0
+        self._last_manual_reconnect_at = 0.0
+
         # Transient only; never persisted or logged.
         self._decoded_pin: str | None = None
 
@@ -127,7 +135,7 @@ class PW200Client:
         self._mqtt.on_disconnect = self._on_disconnect
         self._mqtt.on_subscribe = self._on_subscribe
         self._mqtt.on_message = self._on_message
-        self._mqtt.reconnect_delay_set(min_delay=1, max_delay=60)
+        self._mqtt.reconnect_delay_set(min_delay=1, max_delay=3)
 
         self._mqtt.tls_set(
             ca_certs=self.ca_path,
@@ -296,9 +304,43 @@ class PW200Client:
         )
 
         while time.monotonic() < deadline:
+            now = time.monotonic()
             state = self.state
             if state.device_info and state.raw_status:
                 return True, self._shadow_capabilities()
+
+            if not self.is_connected:
+                with self._shadow_lock:
+                    last_manual_reconnect = self._last_manual_reconnect_at
+
+                if (
+                    not last_manual_reconnect
+                    or now - last_manual_reconnect >= 5.0
+                ):
+                    with self._shadow_lock:
+                        self._last_manual_reconnect_at = now
+                        self._manual_reconnect_attempts += 1
+                        reconnect_attempt = self._manual_reconnect_attempts
+
+                    _LOGGER.warning(
+                        "Powertech MQTT reconnect attempt; attempt=%d",
+                        reconnect_attempt,
+                    )
+                    try:
+                        reconnect_rc = self._mqtt.reconnect()
+                    except Exception as err:
+                        with self._shadow_lock:
+                            self._manual_reconnect_failures += 1
+                        _LOGGER.warning(
+                            "Powertech MQTT reconnect attempt failed; "
+                            "error_type=%s",
+                            type(err).__name__,
+                        )
+                    else:
+                        _LOGGER.debug(
+                            "Powertech MQTT reconnect call returned; rc=%s",
+                            reconnect_rc,
+                        )
 
             if self._shadow_subscribed.is_set():
                 with self._shadow_lock:
@@ -336,6 +378,10 @@ class PW200Client:
             passive_position_messages = (
                 self._passive_position_messages
             )
+            successful_connects = self._successful_connects
+            disconnect_events = self._disconnect_events
+            manual_reconnect_attempts = self._manual_reconnect_attempts
+            manual_reconnect_failures = self._manual_reconnect_failures
             confirmed = sorted(
                 topic
                 for topic, ok in self._shadow_subscription_status.items()
@@ -354,7 +400,9 @@ class PW200Client:
             "publish_failures=%d rs_requested=%s rs_ack_received=%s "
             "rs_ack_format_valid=%s rs_publish_failures=%d "
             "passive_command_ack_messages=%d "
-            "passive_position_messages=%d",
+            "passive_position_messages=%d successful_connects=%d "
+            "disconnect_events=%d reconnect_attempts=%d "
+            "reconnect_failures=%d",
             self.is_connected,
             self._shadow_subscribed.is_set(),
             confirmed,
@@ -369,6 +417,10 @@ class PW200Client:
             system_status_publish_failures,
             passive_command_ack_messages,
             passive_position_messages,
+            successful_connects,
+            disconnect_events,
+            manual_reconnect_attempts,
+            manual_reconnect_failures,
         )
         return False, self._shadow_capabilities()
 
@@ -501,6 +553,16 @@ class PW200Client:
         if reason_code.is_failure:
             return
 
+        with self._shadow_lock:
+            self._successful_connects += 1
+            successful_connects = self._successful_connects
+
+        if successful_connects > 1:
+            _LOGGER.warning(
+                "Powertech MQTT reconnected; reconnect_count=%d",
+                successful_connects - 1,
+            )
+
         # Reconnects start with a new set of SUBACKs. Avoid accepting an
         # earlier connection's subscription readiness.
         self._shadow_subscribed.clear()
@@ -512,8 +574,6 @@ class PW200Client:
             self._system_status_ack_received = False
             self._system_status_ack_format_valid = False
             self._system_status_publish_failures = 0
-            self._passive_command_ack_messages = 0
-            self._passive_position_messages = 0
 
         self._connected.set()
         self._last_disconnect_reason = None
@@ -597,9 +657,23 @@ class PW200Client:
         reason_code,
         properties=None,
     ) -> None:
-        _LOGGER.info(
-            "Powertech MQTT disconnected: %s",
+        raw_reason_code = getattr(reason_code, "value", None)
+        if type(raw_reason_code) is not int:
+            try:
+                raw_reason_code = int(reason_code)
+            except (TypeError, ValueError):
+                raw_reason_code = None
+
+        with self._shadow_lock:
+            self._disconnect_events += 1
+            disconnect_count = self._disconnect_events
+
+        _LOGGER.warning(
+            "Powertech MQTT disconnected during validation; "
+            "code=%s reason=%s disconnect_count=%d",
+            raw_reason_code,
             reason_code,
+            disconnect_count,
         )
         self._connected.clear()
         self._shadow_subscribed.clear()

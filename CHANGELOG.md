@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.12
+- Make the 30-second passive EyeOpen observation resilient to MQTT disconnects.
+- Preserve `wbt01Tx` and `position` message counters across reconnects.
+- Re-subscribe automatically through the normal Paho `on_connect` flow after reconnection.
+- Reduce reconnect backoff during setup validation and add a bounded reconnect fallback while the observation window is active.
+- Add privacy-safe disconnect/reconnect counters and reason-code diagnostics.
+- Keep the test fully passive: no `RS`, OPEN, CLOSE, STOP, PED or other gate command is sent.
+- Keep `DEV INFO` / `DEV STATUS` and PIN-related safety validation unchanged.
+
 ## 0.9.11
 - Add a 30-second passive MQTT observation window during candidate validation.
 - Disable the active `RS` diagnostic request for this test.
