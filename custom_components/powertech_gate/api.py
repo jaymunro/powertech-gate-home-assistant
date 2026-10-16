@@ -89,6 +89,14 @@ class PW200Client:
         self._last_shadow_get_at = 0.0
         self._shadow_publish_failures = 0
 
+        # Read-only system-status diagnostic. The official EyeOpen app sends
+        # c=RS;src=<source_id> to wbt01Rx and receives ACK RS:... on wbt01Tx.
+        # 0.9.10 uses this only after a shadow 404, once per validation run.
+        self._system_status_requested = False
+        self._system_status_ack_received = False
+        self._system_status_ack_format_valid = False
+        self._system_status_publish_failures = 0
+
         # Transient only; never persisted or logged.
         self._decoded_pin: str | None = None
 
@@ -287,6 +295,7 @@ class PW200Client:
             if self._shadow_subscribed.is_set():
                 with self._shadow_lock:
                     last_request = self._last_shadow_get_at
+                    rejected_count = self._shadow_get_rejected
 
                 if (
                     not last_request
@@ -295,6 +304,9 @@ class PW200Client:
                 ):
                     self.request_shadow()
 
+                if rejected_count > 0:
+                    self.request_system_status_diagnostic()
+
             time.sleep(0.1)
 
         with self._shadow_lock:
@@ -302,6 +314,14 @@ class PW200Client:
             accepted = self._shadow_get_accepted
             rejected = self._shadow_get_rejected
             publish_failures = self._shadow_publish_failures
+            system_status_requested = self._system_status_requested
+            system_status_ack_received = self._system_status_ack_received
+            system_status_ack_format_valid = (
+                self._system_status_ack_format_valid
+            )
+            system_status_publish_failures = (
+                self._system_status_publish_failures
+            )
             confirmed = sorted(
                 topic
                 for topic, ok in self._shadow_subscription_status.items()
@@ -317,7 +337,8 @@ class PW200Client:
             "Powertech shadow validation timed out; mqtt_connected=%s "
             "subscriptions_ready=%s confirmed=%s failed=%s "
             "get_attempts=%d get_accepted=%d get_rejected=%d "
-            "publish_failures=%d",
+            "publish_failures=%d rs_requested=%s rs_ack_received=%s "
+            "rs_ack_format_valid=%s rs_publish_failures=%d",
             self.is_connected,
             self._shadow_subscribed.is_set(),
             confirmed,
@@ -326,6 +347,10 @@ class PW200Client:
             accepted,
             rejected,
             publish_failures,
+            system_status_requested,
+            system_status_ack_received,
+            system_status_ack_format_valid,
+            system_status_publish_failures,
         )
         return False, self._shadow_capabilities()
 
@@ -338,6 +363,47 @@ class PW200Client:
             "uart_version": self.state.uart_version is not None,
             "pin_verification": self._decoded_pin is not None,
         }
+
+    def request_system_status_diagnostic(self) -> bool:
+        """Send EyeOpen's read-only RS status request once for diagnostics.
+
+        This does not move the gate. It is only attempted after the default
+        shadow has already returned 404 and the command-ack subscription has
+        been acknowledged.
+        """
+        if not self.is_connected:
+            return False
+
+        with self._shadow_lock:
+            if self._system_status_requested:
+                return False
+            command_ack_ready = (
+                self._shadow_subscription_status.get("command_ack") is True
+            )
+            if not command_ack_ready:
+                return False
+            self._system_status_requested = True
+
+        payload = f"c=RS;src={self.source_id}"
+        info = self._mqtt.publish(
+            self._topic_cmd_rx,
+            payload=payload,
+            qos=0,
+        )
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+            with self._shadow_lock:
+                self._system_status_publish_failures += 1
+            _LOGGER.warning(
+                "Powertech read-only system status diagnostic publish failed; "
+                "rc=%s",
+                info.rc,
+            )
+            return False
+
+        _LOGGER.warning(
+            "Powertech read-only system status diagnostic requested"
+        )
+        return True
 
     def open_gate(self) -> None:
         self._publish_command("FULL OPEN")
@@ -424,6 +490,10 @@ class PW200Client:
             self._pending_subscriptions.clear()
             self._shadow_subscription_status.clear()
             self._last_shadow_get_at = 0.0
+            self._system_status_requested = False
+            self._system_status_ack_received = False
+            self._system_status_ack_format_valid = False
+            self._system_status_publish_failures = 0
 
         self._connected.set()
         self._last_disconnect_reason = None
@@ -529,10 +599,35 @@ class PW200Client:
         )
 
         if msg.topic == self._topic_cmd_tx:
-            _LOGGER.info(
-                "Powertech RX: %s",
-                payload,
-            )
+            if payload.startswith("ACK RS:"):
+                raw_status = payload.split(":", 1)[1].strip()
+                parts = raw_status.split(",")
+                format_valid = (
+                    len(parts) >= 4
+                    and all(
+                        len(part.strip()) == 2
+                        and all(
+                            char in "0123456789abcdefABCDEF"
+                            for char in part.strip()
+                        )
+                        for part in parts
+                    )
+                )
+                with self._shadow_lock:
+                    self._system_status_ack_received = True
+                    self._system_status_ack_format_valid = format_valid
+
+                _LOGGER.warning(
+                    "Powertech read-only system status response received; "
+                    "format_valid=%s status_bytes=%d",
+                    format_valid,
+                    len(parts) if format_valid else 0,
+                )
+            else:
+                _LOGGER.debug(
+                    "Powertech MQTT command-ack message received"
+                )
+
             self.state = replace(
                 self.state,
                 last_ack=payload,

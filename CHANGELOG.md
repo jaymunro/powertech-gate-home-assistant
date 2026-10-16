@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.10
+- Add a single read-only `RS` system-status diagnostic after the default AWS IoT shadow has returned `404`.
+- Match the official EyeOpen WBT01 command format: `c=RS;src=<source_id>` on `<thing>/wbt01Rx`, with the response expected on `<thing>/wbt01Tx`.
+- Record only whether an `ACK RS:` response was received, whether its hexadecimal status format is valid, and the byte count; the raw status payload is not logged by the new diagnostic.
+- Do not use an `ACK RS` response to bypass `DEV INFO` / `DEV STATUS` protocol validation or PIN verification.
+- No OPEN, CLOSE, STOP, PED or other movement command is sent by this diagnostic.
+- Retain the stable MQTT subscription behavior restored in 0.9.9.
+
 ## 0.9.9
 - Remove the broad MQTT wildcard subscriptions introduced in 0.9.8 after community testing showed they could disrupt the AWS IoT session before normal shadow validation completed.
 - Restore the known-good 0.9.7 MQTT subscription behavior.

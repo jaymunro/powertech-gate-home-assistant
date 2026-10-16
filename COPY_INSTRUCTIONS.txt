@@ -1,4 +1,4 @@
-Powertech Gate 0.9.9 – ready-to-copy diagnostic release
+Powertech Gate 0.9.10 – ready-to-copy diagnostic release
 
 Replace:
 - custom_components/powertech_gate/api.py
@@ -6,17 +6,17 @@ Replace:
 - custom_components/powertech_gate/manifest.json
 - CHANGELOG.md
 
-Optional documentation text:
-- README_0.9.9_ADDITION.md
+Optional documentation:
+- README_0.9.10_ADDITION.md
 
 GitHub release text:
-- RELEASE_NOTES_0.9.9.md
+- RELEASE_NOTES_0.9.10.md
 
 Suggested commit:
-Release 0.9.9: restore stable MQTT subscriptions and add endpoint diagnostics
+Release 0.9.10: add read-only WBT system-status diagnostic
 
 Suggested tag:
-0.9.9
+0.9.10
 
 Suggested release title:
-0.9.9 – AWS IoT endpoint diagnostics
+0.9.10 – Read-only WBT system-status diagnostic
