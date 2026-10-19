@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.13
+- Handle Home Assistant startup failures according to config-entry lifecycle expectations.
+- Raise `ConfigEntryNotReady` for temporary AWS IoT/network connection failures so Home Assistant retries automatically.
+- Raise `ConfigEntryError` when configured TLS certificate, private key, or CA material is missing, unreadable, invalid, or rejected.
+- Stop the MQTT client if startup partially succeeds but platform forwarding fails.
+- This release is focused on HACS review compliance and does not change gate protocol behavior.
+
 ## 0.9.12
 - Make the 30-second passive EyeOpen observation resilient to MQTT disconnects.
 - Preserve `wbt01Tx` and `position` message counters across reconnects.
