@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.14
+- Add PS17066 and PS17066C to the pedestrian-capable model registry.
+- This enables the Pedestrian gate entity for PS17066-family controllers after reconfiguration refreshes the stored capability flag.
+- Community diagnostics confirmed backend model `PS17066`, runtime model `PS17066C`, UART version 1, successful protocol/PIN validation, and pedestrian support in the official EyeOpen app.
+- No MQTT topic, parser, movement command, or safety-validation behavior is changed.
+
 ## 0.9.13
 - Handle Home Assistant startup failures according to config-entry lifecycle expectations.
 - Raise `ConfigEntryNotReady` for temporary AWS IoT/network connection failures so Home Assistant retries automatically.

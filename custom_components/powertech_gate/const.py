@@ -52,4 +52,6 @@ KNOWN_PEDESTRIAN_MODELS = {
     "PS20088D",
     "PS20040",
     "PS20040D",
+    "PS17066",
+    "PS17066C",
 }
