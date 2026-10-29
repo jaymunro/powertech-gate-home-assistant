@@ -5,6 +5,12 @@ capture_system_status:
     stops on an unanswered request, and never sends movement commands.
     Enable feedback capture first; download diagnostics after the test.
   fields:
+    include_shadow:
+      name: Include raw status snapshots
+      description: Also request the AWS shadow each sample. Stored data may be stale; compare version and timestamps in diagnostics.
+      default: false
+      selector:
+        boolean:
     config_entry_id:
       name: Integration entry
       description: The loaded Powertech integration to sample.

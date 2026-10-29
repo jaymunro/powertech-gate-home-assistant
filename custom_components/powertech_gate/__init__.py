@@ -58,6 +58,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 ),
                 hass.async_add_executor_job,
                 duration,
+                call.data["include_shadow"],
             )
         except ValueError as err:
             raise ServiceValidationError(str(err)) from err
@@ -67,6 +68,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         schema=vol.Schema({
             vol.Required("config_entry_id"): str,
             vol.Optional("duration", default=60): vol.All(vol.Coerce(int), vol.Range(min=0, max=90)),
+            vol.Optional("include_shadow", default=False): bool,
         }),
     )
     return True

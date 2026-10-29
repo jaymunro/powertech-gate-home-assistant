@@ -26,7 +26,7 @@ class SystemStatusProbe:
     def running(self) -> bool:
         return self.task is not None and not self.task.done()
 
-    def start(self, create_task, executor, duration: int) -> None:
+    def start(self, create_task, executor, duration: int, include_shadow: bool = False) -> None:
         if self.running:
             raise ValueError("A system-status capture is already running")
         if not self.client.uses_position_feedback:
@@ -39,7 +39,7 @@ class SystemStatusProbe:
             raise ValueError("Duration must be between 1 and 90 seconds")
         self.requests = self.responses = 0
         self.finish_reason = "running"
-        self.task = create_task(self._run(executor, duration))
+        self.task = create_task(self._run(executor, duration, include_shadow))
 
     def cancel(self) -> None:
         if self.running:
@@ -50,7 +50,7 @@ class SystemStatusProbe:
         return {"running": self.running, "requests": self.requests,
                 "responses": self.responses, "finish_reason": self.finish_reason}
 
-    async def _run(self, executor, duration: int) -> None:
+    async def _run(self, executor, duration: int, include_shadow: bool) -> None:
         deadline = self._clock() + duration
         try:
             while self._clock() < deadline:
@@ -59,6 +59,9 @@ class SystemStatusProbe:
                     return
                 before = self.client.system_status_generation
                 sent_at = self._clock()
+                if include_shadow and not await executor(self.client.request_shadow):
+                    self.finish_reason = "shadow_publish_unavailable"
+                    return
                 if not await executor(self.client.request_fresh_system_status):
                     self.finish_reason = "publish_unavailable"
                     return
