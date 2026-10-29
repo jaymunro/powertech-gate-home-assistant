@@ -79,6 +79,27 @@ class StatusProbeTests(unittest.IsolatedAsyncioTestCase):
             receive(self.client, self.client._topic_cmd_tx, text)
         self.assertEqual(self.client.system_status_generation, 0)
 
+    async def test_legacy_uart_reads_status_and_records_mode_and_position(self):
+        self.client.state.uart_version = 1
+        original = self.client._mqtt.publish
+        def publish(topic, payload, qos=0):
+            result = original(topic, payload, qos)
+            receive(self.client, self.client._topic_cmd_tx, "ACK STATUS:PED OPENED,40;src=PRIVATE")
+            return result
+        self.client._mqtt.publish = publish
+        self.probe.start(asyncio.create_task, self.executor, 1)
+        await self.probe.task
+        self.assertEqual(self.client._mqtt.published, [
+            (self.client._topic_cmd_rx, "c=READ STATUS;src=private-source", 0),
+        ])
+        self.assertEqual(self.probe.responses, 1)
+        self.assertEqual(self.probe.finish_reason, "window_complete")
+        reply = self.client.feedback_capture.snapshot()["events"][0]
+        self.assertEqual(reply["status"], "PED OPENED")
+        self.assertEqual(reply["status_position"], 40)
+        self.assertNotIn("PRIVATE", str(reply))
+        self.assertIsNone(self.client.state.position)
+
     async def test_unready_subscription_or_failed_publish_stops(self):
         for ready in (False, True):
             self.client._shadow_subscription_status["command_ack"] = ready
