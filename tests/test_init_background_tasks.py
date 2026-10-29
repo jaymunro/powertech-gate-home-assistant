@@ -93,6 +93,8 @@ class FakeClient:
         self.started = self.stopped = self.listener_removed = False
         self.capture_settings = []
         self.feedback_capture = types.SimpleNamespace(set_enabled=self.capture_settings.append)
+        async def poll(_executor): pass
+        self.status_poller = types.SimpleNamespace(run=poll)
 
     def start(self): self.started = True
     def stop(self): self.stopped = True
@@ -147,10 +149,11 @@ class BackgroundRefreshTests(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_is_entry_owned_background_task(self):
         hass = FakeHass()
         self.assertTrue(await self.integration.async_setup_entry(hass, self.entry))
-        self.assertEqual(len(self.entry.background_tasks), 1)
+        self.assertEqual(len(self.entry.background_tasks), 2)
         task_hass, _coroutine, name = self.entry.background_tasks[0]
         self.assertIs(task_hass, hass)
         self.assertEqual(name, "powertech_gate_entry-id_shadow_refresh")
+        self.assertEqual(self.entry.background_tasks[1][2], "powertech_gate_entry-id_status_poll")
         self.assertNotIn("entry-id_refresh_task", hass.data["powertech_gate"])
 
     async def test_successful_unload_cleans_runtime_resources(self):
