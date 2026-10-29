@@ -1,19 +1,23 @@
-# Explicit system-status capture — 0.9.16b3
+# Explicit system-status capture — 0.9.16b4
 
 Separate diagnostic branch based on the tested position-feedback build. Adds
 `powertech_gate.capture_system_status` for a specifically selected loaded PS19001
 config entry. It never starts automatically.
 
-The action sends only the fixed read-only `RS` command, with the existing source
+The action sends only fixed read-only status commands: `READ STATUS` for reported UART 1,
+or `RS` for newer UART, with the existing source
 ID, on the existing authenticated MQTT connection. It accepts no arbitrary
 command, topic, credentials or payload. Cover commands and feedback logic are
-unchanged from b2. Raw replies are captured with the existing numeric allowlist;
+unchanged from b2. The initial RS idle test on this UART-1 controller returned `ERROR:RS;src`;
+b4 therefore follows the app's legacy READ STATUS selection.
+
+Raw replies are captured with the existing numeric allowlist;
 the probe does not apply RS data to cover state.
 
 Enable feedback capture first. Set `config_entry_id` to the desired integration
 entry and `duration` to 1-90 seconds (default 60). Duration 0 cancels. Requests
 are at least two seconds apart, with at most 45 during a 90-second window.
-The probe waits up to three seconds for a structurally valid RS reply and stops
+The probe waits up to three seconds for a structurally valid RS or ACK STATUS reply and stops
 after the first unanswered request. It also stops on publish failure,
 disconnection, disabled capture, cancellation, or entry unload/restart. Concurrent
 probes for the same client are rejected. A final reply may be awaited up to
@@ -21,7 +25,7 @@ three seconds beyond the sampling window.
 
 Diagnostics include `system_status_probe` request/response counts and finish
 reason. Capture includes timestamped `status_request` events and allowlisted
-`ACK RS` bytes. A valid reply is evidence of a response to an RS-capable path,
+`ACK RS` bytes or `ACK STATUS` mode/position. A valid reply is evidence of a response to an RS-capable path,
 not proof that the firmware freshly sampled every sensor. Compare changing
 bytes with observed movement. RS has no transaction ID, so replies from another
 client cannot be distinguished; keep EyeOpen closed during controlled captures.
