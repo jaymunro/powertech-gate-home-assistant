@@ -94,7 +94,36 @@ class StatusProbeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.probe.requests, 1)
         self.assertEqual(self.probe.responses, 0)
         self.assertEqual(self.probe.finish_reason, "no_response")
-        self.assertLess(self.clock(), 3.2)
+        self.assertGreaterEqual(self.clock(), 8)
+        self.assertLess(self.clock(), 8.2)
+
+    async def test_delayed_response_does_not_end_capture_at_three_seconds(self):
+        async def sleep(duration):
+            await self.clock.sleep(duration)
+            if self.clock() >= 3.2 and self.client.system_status_generation == 0:
+                receive(self.client, self.client._topic_cmd_tx, "ACK STATUS:PED OPENED,98")
+        self.probe._sleep = sleep
+        self.probe.start(asyncio.create_task, self.executor, 1)
+        await self.probe.task
+        self.assertEqual(self.probe.responses, 1)
+        self.assertEqual(self.probe.finish_reason, "window_complete")
+
+    async def test_explicit_rs_on_legacy_uart_is_one_fixed_request(self):
+        self.client.state.uart_version = 1
+        self.respond_to_reads()
+        self.probe.start(asyncio.create_task, self.executor, 1, False, "rs")
+        await self.probe.task
+        self.assertEqual(self.client._mqtt.published, [
+            (self.client._topic_cmd_rx, "c=RS;src=private-source", 0),
+        ])
+        self.assertEqual(self.probe.responses, 1)
+        self.assertEqual(self.probe.finish_reason, "window_complete")
+
+    async def test_explicit_rs_rejects_repeated_or_arbitrary_commands(self):
+        for duration, protocol in ((2, "rs"), (90, "rs"), (1, "FULL OPEN")):
+            with self.assertRaises(ValueError):
+                self.probe.start(asyncio.create_task, self.executor, duration, False, protocol)
+        self.assertEqual(self.client._mqtt.published, [])
 
     async def test_invalid_ack_does_not_count_as_status_response(self):
         for text in ("ACK FULL OPEN", "ACK RS:not-a-status", "ACK RS:00,00,00"):

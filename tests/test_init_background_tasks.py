@@ -206,9 +206,14 @@ class BackgroundRefreshTests(unittest.IsolatedAsyncioTestCase):
         hass.data[domain] = {"entry-id": self.client}
         hass.config_entries.async_get_entry = lambda entry_id: self.entry if entry_id == "entry-id" else None
         await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id"})))
-        creator, executor, duration, include_shadow = starts[0]
+        creator, executor, duration, include_shadow, protocol = starts[0]
         self.assertEqual(duration, 60)
         self.assertFalse(include_shadow)
+        self.assertEqual(protocol, "auto")
+        with self.assertRaises(vol.Invalid):
+            schema({"config_entry_id": "entry-id", "protocol": "FULL OPEN"})
+        await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id", "duration": 1, "protocol": "rs"})))
+        self.assertEqual(starts[-1][4], "rs")
         await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id", "include_shadow": True})))
         self.assertTrue(starts[-1][3])
         async def sample(): pass
