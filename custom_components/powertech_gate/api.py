@@ -14,6 +14,8 @@ import uuid
 
 import paho.mqtt.client as mqtt
 
+from .feedback_capture import FeedbackCapture
+
 from .const import (
     DEFAULT_PORT,
     STATE_CLOSED,
@@ -73,6 +75,7 @@ class PW200Client:
         self.device_type = device_type
 
         self.state = PW200State()
+        self.feedback_capture = FeedbackCapture()
         self._listeners: set[Callable[[], None]] = set()
         self._connected = threading.Event()
         self._last_disconnect_reason: str | None = None
@@ -681,7 +684,27 @@ class PW200Client:
         self.state = replace(self.state, online=False)
         self._notify()
 
-    def _on_message(
+    def _on_message(self, client, userdata, msg) -> None:
+        """Preserve message handling and observe only allowlisted feedback."""
+        self._handle_message(client, userdata, msg)
+        if not self.feedback_capture.enabled:
+            return
+        kind = {
+            self._topic_position: "position",
+            self._topic_cmd_tx: "command_ack",
+            self._topic_shadow_ok: "shadow_get",
+            self._topic_shadow_update: "shadow_update",
+        }.get(msg.topic)
+        if kind is not None:
+            try:
+                self.feedback_capture.record_message(
+                    kind, msg.payload.decode("utf-8", errors="replace"), self.state, msg
+                )
+            except Exception:
+                # Capture must never interrupt normal gate feedback handling.
+                _LOGGER.debug("Powertech feedback capture skipped an invalid message")
+
+    def _handle_message(
         self,
         client,
         userdata,

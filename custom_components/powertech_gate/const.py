@@ -30,6 +30,7 @@ CONF_PROTOCOL_VALIDATED = "protocol_validated"
 CONF_PIN_VERIFIED = "pin_verified"
 CONF_REFRESH_INTERVAL = "refresh_interval"
 CONF_ENABLE_DEBUG_ATTRIBUTES = "enable_debug_attributes"
+CONF_CAPTURE_FEEDBACK = "capture_feedback"
 
 DEFAULT_ENDPOINT = "a1acnzxd6t4jcn-ats.iot.eu-central-1.amazonaws.com"
 DEFAULT_SOURCE_ID = "P0045F3C"
@@ -48,6 +49,7 @@ STATE_UNKNOWN = "unknown"
 DEFAULT_REFRESH_INTERVAL = 60
 
 KNOWN_PEDESTRIAN_MODELS = {
+    "PS19001",
     "PS20088",
     "PS20088D",
     "PS20040",

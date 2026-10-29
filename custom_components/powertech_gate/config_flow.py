@@ -34,6 +34,7 @@ from .backend import (
     provision,
 )
 from .const import (
+    CONF_CAPTURE_FEEDBACK,
     CONF_CA_PATH,
     CONF_CERT_PATH,
     CONF_DEVICE_LABEL,
@@ -763,6 +764,10 @@ class PowertechGateOptionsFlow(config_entries.OptionsFlow):
                         vol.Coerce(int),
                         vol.Range(min=15, max=3600),
                     ),
+                    vol.Optional(
+                        CONF_CAPTURE_FEEDBACK,
+                        default=self._entry.options.get(CONF_CAPTURE_FEEDBACK, False),
+                    ): bool,
                     vol.Optional(
                         CONF_ENABLE_DEBUG_ATTRIBUTES,
                         default=self._entry.options.get(

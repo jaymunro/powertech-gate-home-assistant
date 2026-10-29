@@ -14,6 +14,7 @@ from homeassistant.helpers import device_registry as dr
 
 from .api import PW200Client
 from .const import (
+    CONF_CAPTURE_FEEDBACK,
     CONF_CA_PATH,
     CONF_CERT_PATH,
     CONF_DEVICE_LABEL,
@@ -60,6 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Powertech PW200."""
     try:
         client = await hass.async_add_executor_job(_create_client, hass, entry)
+        client.feedback_capture.set_enabled(entry.options.get(CONF_CAPTURE_FEEDBACK, False))
     except (FileNotFoundError, PermissionError, ssl.SSLError) as err:
         raise ConfigEntryError(
             "Powertech certificate, key, or CA file is missing, unreadable, or invalid"
@@ -81,6 +83,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ) from err
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = client
+    async def _update_capture_options(hass: HomeAssistant, updated: ConfigEntry) -> None:
+        client.feedback_capture.set_enabled(updated.options.get(CONF_CAPTURE_FEEDBACK, False))
+
+    entry.async_on_unload(entry.add_update_listener(_update_capture_options))
 
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
