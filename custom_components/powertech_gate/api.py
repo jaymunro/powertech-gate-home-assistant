@@ -14,7 +14,7 @@ import uuid
 
 import paho.mqtt.client as mqtt
 
-from .feedback_capture import FeedbackCapture
+from .feedback_capture import FeedbackCapture, safe_ack
 from .status_probe import SystemStatusProbe
 
 from .const import (
@@ -497,14 +497,17 @@ class PW200Client:
             return self._system_status_generation
 
     def request_fresh_system_status(self) -> bool:
-        """Publish the fixed read-only RS command for an explicit probe."""
+        """Publish the model's fixed read-only status command for a probe."""
         if not self.is_connected:
             return False
         with self._shadow_lock:
             if self._shadow_subscription_status.get("command_ack") is not True:
                 return False
+        # EyeOpen maps reported UART 1 to its legacy protocol and selects
+        # READ STATUS. Reported UART 2 selects RS instead.
+        command = "READ STATUS" if self.state.uart_version == 1 else "RS"
         info = self._mqtt.publish(
-            self._topic_cmd_rx, payload=f"c=RS;src={self.source_id}", qos=0,
+            self._topic_cmd_rx, payload=f"c={command};src={self.source_id}", qos=0,
         )
         accepted = info.rc == mqtt.MQTT_ERR_SUCCESS
         self.feedback_capture.record_status_request(accepted)
@@ -787,6 +790,10 @@ class PW200Client:
                 _LOGGER.debug(
                     "Powertech MQTT command-ack message received"
                 )
+                parsed = safe_ack(payload)
+                if parsed.get("ack") == "ACK STATUS" and 0 <= parsed["status_position"] <= 100:
+                    with self._shadow_lock:
+                        self._system_status_generation += 1
 
             self.state = replace(
                 self.state,

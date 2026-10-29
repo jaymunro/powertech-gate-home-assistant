@@ -1,7 +1,7 @@
 capture_system_status:
   name: Capture system status
   description: >-
-    Read-only PS19001 diagnostic sampling. Sends RS at most once every two seconds,
+    Read-only PS19001 diagnostic sampling. Sends READ STATUS (UART 1) or RS at most once every two seconds,
     stops on an unanswered request, and never sends movement commands.
     Enable feedback capture first; download diagnostics after the test.
   fields:
