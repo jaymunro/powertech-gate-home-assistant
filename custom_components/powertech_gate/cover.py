@@ -98,7 +98,7 @@ class _PW200BaseCover(CoverEntity):
         if self._client.feedback_capture.enabled:
             self._client.feedback_capture.record_cover(
                 "pedestrian" if self._attr_translation_key == "pedestrian_gate" else "full",
-                self.is_closed, self.is_opening, self.is_closing,
+                self.is_closed, self.is_opening, self.is_closing, self.available,
             )
 
 

@@ -132,12 +132,15 @@ class FeedbackCapture:
             return
         self._append(kind, fields)
 
-    def record_cover(self, mode: str, closed: bool | None, opening: bool, closing: bool) -> None:
+    def record_cover(self, mode: str, closed: bool | None, opening: bool, closing: bool,
+                     available: bool = True) -> None:
         if mode not in {"full", "pedestrian"}:
             return
         state = "opening" if opening else "closing" if closing else (
             "closed" if closed is True else "open" if closed is False else "unknown"
         )
+        if not available:
+            state = "unavailable"
         self._append("cover", {"mode": mode, "state": state})
 
     def snapshot(self) -> dict:
