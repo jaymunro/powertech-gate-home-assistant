@@ -1,4 +1,4 @@
-# Explicit system-status capture — 0.9.16b4
+# Explicit system-status capture — 0.9.16b5
 
 Separate diagnostic branch based on the tested position-feedback build. Adds
 `powertech_gate.capture_system_status` for a specifically selected loaded PS19001
@@ -13,6 +13,11 @@ b4 therefore follows the app's legacy READ STATUS selection.
 
 Raw replies are captured with the existing numeric allowlist;
 the probe does not apply RS data to cover state.
+
+b5 also recognizes the legacy `SINGLE` status prefix. The previous allowlist
+missed `ACK STATUS:SINGLE STOPPED,26` and stopped a pedestrian capture early.
+This only corrects capture parsing; it does not assign physical leaf semantics
+to `SINGLE`, `PED`, or their numeric positions.
 
 Enable feedback capture first. Set `config_entry_id` to the desired integration
 entry and `duration` to 1-90 seconds (default 60). Duration 0 cancels. Requests
