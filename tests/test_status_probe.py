@@ -100,6 +100,38 @@ class StatusProbeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("PRIVATE", str(reply))
         self.assertIsNone(self.client.state.position)
 
+    async def test_single_replies_keep_probe_running_and_remain_redacted(self):
+        self.client.state.uart_version = 1
+        replies = iter(("SINGLE OPENING,13", "SINGLE STOPPED,26", "SINGLE CLOSED,0"))
+        original = self.client._mqtt.publish
+        def publish(topic, payload, qos=0):
+            result = original(topic, payload, qos)
+            receive(self.client, self.client._topic_cmd_tx,
+                    "ACK STATUS:" + next(replies) + ";src=PRIVATE")
+            return result
+        self.client._mqtt.publish = publish
+        self.probe.start(asyncio.create_task, self.executor, 5)
+        await self.probe.task
+        self.assertEqual(self.probe.requests, 3)
+        self.assertEqual(self.probe.responses, 3)
+        self.assertEqual(self.probe.finish_reason, "window_complete")
+        events = self.client.feedback_capture.snapshot()["events"]
+        statuses = [(e["status"], e["status_position"]) for e in events if e.get("ack") == "ACK STATUS"]
+        self.assertEqual(statuses, [("SINGLE OPENING", 13), ("SINGLE STOPPED", 26), ("SINGLE CLOSED", 0)])
+        self.assertNotIn("PRIVATE", str(events))
+        self.assertIsNone(self.client.state.position)
+        self.assertEqual(set(self.client._mqtt.published), {
+            (self.client._topic_cmd_rx, "c=READ STATUS;src=private-source", 0),
+        })
+
+    async def test_unknown_or_invalid_single_status_does_not_count(self):
+        for reply in ("ACK STATUS:SINGLE SECRET,26", "ACK STATUS:SINGLE STOPPED,-1",
+                      "ACK STATUS:SINGLE STOPPED,101", "ACK STATUS:SINGLE STOPPED,26,PRIVATE"):
+            receive(self.client, self.client._topic_cmd_tx, reply)
+        self.assertEqual(self.client.system_status_generation, 0)
+        self.assertNotIn("SECRET", str(self.client.feedback_capture.snapshot()))
+        self.assertNotIn("PRIVATE", str(self.client.feedback_capture.snapshot()))
+
     async def test_unready_subscription_or_failed_publish_stops(self):
         for ready in (False, True):
             self.client._shadow_subscription_status["command_ack"] = ready
