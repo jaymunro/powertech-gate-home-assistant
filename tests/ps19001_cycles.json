@@ -1,0 +1,241 @@
+[
+  {
+    "name": "physical_pedestrian",
+    "messages": [
+      {
+        "kind": "shadow_get",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793301442,
+        "shadow_version": 21078
+      },
+      {
+        "kind": "position",
+        "position_payload": 20
+      },
+      {
+        "kind": "shadow_update",
+        "status_bytes": [
+          0,
+          0,
+          32,
+          26,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303371,
+        "shadow_version": 21079
+      },
+      {
+        "kind": "position",
+        "position_payload": 40
+      },
+      {
+        "kind": "shadow_update",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303382,
+        "shadow_version": 21080
+      },
+      {
+        "kind": "position",
+        "position_payload": 20
+      },
+      {
+        "kind": "position",
+        "position_payload": 0
+      },
+      {
+        "kind": "shadow_get",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303382,
+        "shadow_version": 21080
+      }
+    ]
+  },
+  {
+    "name": "physical_full",
+    "messages": [
+      {
+        "kind": "shadow_get",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303382,
+        "shadow_version": 21080
+      },
+      {
+        "kind": "position",
+        "position_payload": 40
+      },
+      {
+        "kind": "position",
+        "position_payload": 80
+      },
+      {
+        "kind": "position",
+        "position_payload": 100
+      },
+      {
+        "kind": "position",
+        "position_payload": 80
+      },
+      {
+        "kind": "position",
+        "position_payload": 40
+      },
+      {
+        "kind": "position",
+        "position_payload": 20
+      },
+      {
+        "kind": "position",
+        "position_payload": 0
+      },
+      {
+        "kind": "shadow_get",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303382,
+        "shadow_version": 21080
+      }
+    ]
+  },
+  {
+    "name": "ha_pedestrian",
+    "messages": [
+      {
+        "kind": "shadow_get",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303382,
+        "shadow_version": 21080
+      },
+      {
+        "kind": "command_ack",
+        "ack": "ACK PED OPEN"
+      },
+      {
+        "kind": "position",
+        "position_payload": 20
+      },
+      {
+        "kind": "shadow_update",
+        "status_bytes": [
+          0,
+          0,
+          32,
+          26,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303734,
+        "shadow_version": 21081
+      },
+      {
+        "kind": "position",
+        "position_payload": 40
+      },
+      {
+        "kind": "shadow_update",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303743,
+        "shadow_version": 21082
+      },
+      {
+        "kind": "position",
+        "position_payload": 20
+      },
+      {
+        "kind": "position",
+        "position_payload": 0
+      },
+      {
+        "kind": "shadow_get",
+        "status_bytes": [
+          0,
+          0,
+          16,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "status_timestamp": 1793303743,
+        "shadow_version": 21082
+      }
+    ]
+  }
+]
