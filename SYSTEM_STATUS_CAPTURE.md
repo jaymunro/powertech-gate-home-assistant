@@ -1,8 +1,14 @@
-# Explicit system-status capture — 0.9.16b6
+# Explicit system-status capture — 0.9.16b7
 
 Separate diagnostic branch based on the tested position-feedback build. Adds
 `powertech_gate.capture_system_status` for a specifically selected loaded PS19001
 config entry. It never starts automatically.
+
+b7 waits up to eight seconds for a reply (P3.6 testing observed a valid reply
+after the former three-second timeout). `protocol` defaults to `auto`, preserving
+UART selection. `protocol: rs` requires `duration: 1` and sends exactly one fixed
+RS read for an explicitly requested compatibility check. It accepts no arbitrary
+command and does not change stored UART version or cover behavior.
 
 b6 adds optional `include_shadow: true`: each sample also requests the existing
 AWS shadow with fixed empty payload. This reads stored cloud data and does not
@@ -29,11 +35,11 @@ to `SINGLE`, `PED`, or their numeric positions.
 Enable feedback capture first. Set `config_entry_id` to the desired integration
 entry and `duration` to 1-90 seconds (default 60). Duration 0 cancels. Requests
 are at least two seconds apart, with at most 45 during a 90-second window.
-The probe waits up to three seconds for a structurally valid RS or ACK STATUS reply and stops
+The probe waits up to eight seconds for a structurally valid RS or ACK STATUS reply and stops
 after the first unanswered request. It also stops on publish failure,
 disconnection, disabled capture, cancellation, or entry unload/restart. Concurrent
 probes for the same client are rejected. A final reply may be awaited up to
-three seconds beyond the sampling window.
+eight seconds beyond the sampling window.
 
 Diagnostics include `system_status_probe` request/response counts and finish
 reason. Capture includes timestamped `status_request` events and allowlisted
