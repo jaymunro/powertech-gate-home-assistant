@@ -59,6 +59,7 @@ def _load_integration():
         "CONF_ENDPOINT": "endpoint", "CONF_KEY_PATH": "key_path",
         "CONF_REFRESH_INTERVAL": "refresh_interval", "CONF_SOURCE_ID": "source_id",
         "CONF_THING_ID": "thing_id", "DEFAULT_REFRESH_INTERVAL": 300,
+        "CONF_CAPTURE_FEEDBACK": "capture_feedback",
         "DEFAULT_SOURCE_ID": "source", "DOMAIN": "powertech_gate",
     }.items():
         setattr(component_const, name, value)
@@ -88,6 +89,8 @@ class FakeClient:
 
     def __init__(self):
         self.started = self.stopped = self.listener_removed = False
+        self.capture_settings = []
+        self.feedback_capture = types.SimpleNamespace(set_enabled=self.capture_settings.append)
 
     def start(self): self.started = True
     def stop(self): self.stopped = True
@@ -104,6 +107,10 @@ class FakeEntry:
     data = {"endpoint": "test.invalid", "thing_id": "test-thing", "cert_path": "/not-used", "key_path": "/not-used"}
 
     def __init__(self): self.background_tasks = []
+    def add_update_listener(self, listener):
+        self.update_listener = listener
+        return lambda: None
+    def async_on_unload(self, cleanup): pass
     def async_create_background_task(self, hass, coroutine, name):
         self.background_tasks.append((hass, coroutine, name))
         coroutine.close()
@@ -151,6 +158,15 @@ class BackgroundRefreshTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.client.listener_removed)
         self.assertTrue(self.client.stopped)
         self.assertNotIn("entry-id", hass.data["powertech_gate"])
+
+    async def test_capture_options_apply_without_restart_or_new_client(self):
+        hass = FakeHass()
+        await self.integration.async_setup_entry(hass, self.entry)
+        self.assertEqual(self.client.capture_settings, [False])
+        self.entry.options = {"capture_feedback": True}
+        await self.entry.update_listener(hass, self.entry)
+        self.assertEqual(self.client.capture_settings, [False, True])
+        self.assertIs(hass.data["powertech_gate"][self.entry.entry_id], self.client)
 
     async def test_failed_unload_keeps_runtime_resources(self):
         hass = FakeHass(unload_ok=False)
