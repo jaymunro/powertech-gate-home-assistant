@@ -90,6 +90,9 @@
       },
       "wifi_mac": {
         "name": "Wi-Fi MAC"
+      },
+      "position": {
+        "name": "Vezérlő pozíciója"
       }
     }
   },
