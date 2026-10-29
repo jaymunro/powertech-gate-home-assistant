@@ -1,8 +1,15 @@
-# Explicit system-status capture — 0.9.16b5
+# Explicit system-status capture — 0.9.16b6
 
 Separate diagnostic branch based on the tested position-feedback build. Adds
 `powertech_gate.capture_system_status` for a specifically selected loaded PS19001
 config entry. It never starts automatically.
+
+b6 adds optional `include_shadow: true`: each sample also requests the existing
+AWS shadow with fixed empty payload. This reads stored cloud data and does not
+force a fresh controller measurement. Compare captured raw bytes, shadow version
+and status timestamps against the live text replies. Defaults to false; only the
+explicit bounded capture uses this faster snapshot cadence. A failed shadow
+publish stops the capture. At most 45 shadow GETs in a 90-second window.
 
 The action sends only fixed read-only status commands: `READ STATUS` for reported UART 1,
 or `RS` for newer UART, with the existing source
