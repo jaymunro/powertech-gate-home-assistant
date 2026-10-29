@@ -1,8 +1,12 @@
-# Explicit system-status capture — 0.9.16b7
+# Explicit system-status capture — 0.9.16b8
 
 Separate diagnostic branch based on the tested position-feedback build. Adds
 `powertech_gate.capture_system_status` for a specifically selected loaded PS19001
 config entry. It never starts automatically.
+
+b8 also adds separate background legacy status polling and access-mode cover
+feedback for PS19001 UART1. See ACTIVE_STATUS_FEEDBACK.md. The diagnostic probe
+still starts only explicitly; it pauses background polling to avoid overlap.
 
 b7 waits up to eight seconds for a reply (P3.6 testing observed a valid reply
 after the former three-second timeout). `protocol` defaults to `auto`, preserving
@@ -20,8 +24,8 @@ publish stops the capture. At most 45 shadow GETs in a 90-second window.
 The action sends only fixed read-only status commands: `READ STATUS` for reported UART 1,
 or `RS` for newer UART, with the existing source
 ID, on the existing authenticated MQTT connection. It accepts no arbitrary
-command, topic, credentials or payload. Cover commands and feedback logic are
-unchanged from b2. The initial RS idle test on this UART-1 controller returned `ERROR:RS;src`;
+command, topic, credentials or payload. Cover commands are unchanged; b8 feedback
+behavior is documented separately. The initial RS idle test on this UART-1 controller returned `ERROR:RS;src`;
 b4 therefore follows the app's legacy READ STATUS selection.
 
 Raw replies are captured with the existing numeric allowlist;
