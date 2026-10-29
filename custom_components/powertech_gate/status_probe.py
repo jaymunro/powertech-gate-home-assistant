@@ -29,6 +29,8 @@ class SystemStatusProbe:
     def start(self, create_task, executor, duration: int, include_shadow: bool = False, protocol: str = "auto") -> None:
         if self.running:
             raise ValueError("A system-status capture is already running")
+        if self.client.status_poller.waiting:
+            raise ValueError("A background status request is pending; retry shortly")
         if not self.client.uses_position_feedback:
             raise ValueError("This diagnostic build supports PS19001 status capture only")
         if not self.client.feedback_capture.enabled:

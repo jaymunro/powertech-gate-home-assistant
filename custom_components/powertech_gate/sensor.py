@@ -154,3 +154,14 @@ class PowertechPositionSensor(_PW200DiagnosticSensor):
     @property
     def native_value(self) -> int | None:
         return self._client.state.position if self._client.state.position_received else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and (
+            not self._client.uses_access_mode_feedback or self._client.live_feedback_available
+        )
+
+    @property
+    def extra_state_attributes(self):
+        return {"meaning": "raw controller travel, not per-leaf percentage",
+                "opening_mode": self._client.state.opening_mode}

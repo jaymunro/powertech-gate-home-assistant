@@ -125,6 +125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ) from err
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = client
+    client.status_feedback_enabled = True
     async def _update_capture_options(hass: HomeAssistant, updated: ConfigEntry) -> None:
         client.feedback_capture.set_enabled(updated.options.get(CONF_CAPTURE_FEEDBACK, False))
 
@@ -183,6 +184,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         _periodic_shadow_refresh(),
         f"{DOMAIN}_{entry.entry_id}_shadow_refresh",
+    )
+    entry.async_create_background_task(
+        hass, client.status_poller.run(hass.async_add_executor_job),
+        f"{DOMAIN}_{entry.entry_id}_status_poll",
     )
     return True
 
