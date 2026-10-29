@@ -42,6 +42,7 @@ def _load_integration():
     exceptions = types.ModuleType("homeassistant.exceptions")
     exceptions.ConfigEntryError = RuntimeError
     exceptions.ConfigEntryNotReady = RuntimeError
+    exceptions.ServiceValidationError = RuntimeError
     sys.modules["homeassistant.exceptions"] = exceptions
 
     helpers = types.ModuleType("homeassistant.helpers")
@@ -49,6 +50,7 @@ def _load_integration():
     device_registry.CONNECTION_NETWORK_MAC = "mac"
     device_registry.async_get = lambda hass: hass.device_registry
     helpers.device_registry = device_registry
+    helpers.config_validation = types.SimpleNamespace(config_entry_only_config_schema=lambda domain: object())
     sys.modules["homeassistant.helpers"] = helpers
     sys.modules["homeassistant.helpers.device_registry"] = device_registry
 
@@ -175,3 +177,41 @@ class BackgroundRefreshTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.client.listener_removed)
         self.assertFalse(self.client.stopped)
         self.assertIn("entry-id", hass.data["powertech_gate"])
+
+    async def test_diagnostic_action_schema_target_and_background_ownership(self):
+        try:
+            import voluptuous as vol
+        except ImportError:
+            self.skipTest("Install voluptuous to exercise the real action schema")
+        hass = FakeHass()
+        registrations = []
+        hass.services = types.SimpleNamespace(
+            async_register=lambda *args, **kwargs: registrations.append((args, kwargs)),
+        )
+        self.assertTrue(await self.integration.async_setup(hass, {}))
+        (domain, action, handler), kwargs = registrations[0]
+        self.assertEqual((domain, action), ("powertech_gate", "capture_system_status"))
+        schema = kwargs["schema"]
+        for invalid in ({}, {"config_entry_id": "entry-id", "duration": 91},
+                        {"config_entry_id": "entry-id", "command": "FULL OPEN"}):
+            with self.assertRaises(vol.Invalid):
+                schema(invalid)
+        starts = []
+        cancelled = []
+        self.client.status_probe = types.SimpleNamespace(
+            start=lambda *args: starts.append(args), cancel=lambda: cancelled.append(True),
+        )
+        self.integration.PW200Client = FakeClient
+        self.entry.domain = "powertech_gate"
+        hass.data[domain] = {"entry-id": self.client}
+        hass.config_entries.async_get_entry = lambda entry_id: self.entry if entry_id == "entry-id" else None
+        await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id"})))
+        creator, executor, duration = starts[0]
+        self.assertEqual(duration, 60)
+        async def sample(): pass
+        creator(sample())
+        self.assertEqual(self.entry.background_tasks[-1][2], "powertech_gate_entry-id_system_status_probe")
+        await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id", "duration": 0})))
+        self.assertEqual(cancelled, [True])
+        with self.assertRaisesRegex(RuntimeError, "not loaded"):
+            await handler(types.SimpleNamespace(data=schema({"config_entry_id": "missing"})))
