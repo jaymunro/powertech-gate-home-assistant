@@ -15,6 +15,7 @@ import uuid
 import paho.mqtt.client as mqtt
 
 from .feedback_capture import FeedbackCapture
+from .status_probe import SystemStatusProbe
 
 from .const import (
     DEFAULT_PORT,
@@ -80,6 +81,8 @@ class PW200Client:
 
         self.state = PW200State()
         self.feedback_capture = FeedbackCapture()
+        self.status_probe = SystemStatusProbe(self)
+        self._system_status_generation = 0
         self._listeners: set[Callable[[], None]] = set()
         self._connected = threading.Event()
         self._last_disconnect_reason: str | None = None
@@ -487,6 +490,26 @@ class PW200Client:
         )
         return True
 
+    @property
+    def system_status_generation(self) -> int:
+        """Count structurally valid RS replies without exposing payloads."""
+        with self._shadow_lock:
+            return self._system_status_generation
+
+    def request_fresh_system_status(self) -> bool:
+        """Publish the fixed read-only RS command for an explicit probe."""
+        if not self.is_connected:
+            return False
+        with self._shadow_lock:
+            if self._shadow_subscription_status.get("command_ack") is not True:
+                return False
+        info = self._mqtt.publish(
+            self._topic_cmd_rx, payload=f"c=RS;src={self.source_id}", qos=0,
+        )
+        accepted = info.rc == mqtt.MQTT_ERR_SUCCESS
+        self.feedback_capture.record_status_request(accepted)
+        return accepted
+
     def open_gate(self) -> None:
         self._publish_command("FULL OPEN")
 
@@ -735,10 +758,10 @@ class PW200Client:
             )
 
             if payload.startswith("ACK RS:"):
-                raw_status = payload.split(":", 1)[1].strip()
+                raw_status = payload.split(":", 1)[1].split(";", 1)[0].strip()
                 parts = raw_status.split(",")
                 format_valid = (
-                    len(parts) >= 4
+                    4 <= len(parts) <= 16
                     and all(
                         len(part.strip()) == 2
                         and all(
@@ -751,6 +774,8 @@ class PW200Client:
                 with self._shadow_lock:
                     self._system_status_ack_received = True
                     self._system_status_ack_format_valid = format_valid
+                    if format_valid:
+                        self._system_status_generation += 1
 
                 _LOGGER.warning(
                     "Powertech read-only system status response received; "

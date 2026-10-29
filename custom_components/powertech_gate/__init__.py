@@ -11,6 +11,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv
 
 from .api import PW200Client
 from .const import (
@@ -32,6 +33,43 @@ from .device import format_mac
 
 PLATFORMS = [Platform.COVER, Platform.SENSOR]
 _LOGGER = logging.getLogger(__name__)
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register the explicit diagnostic action, independent of entry loading."""
+    import voluptuous as vol
+    from homeassistant.exceptions import ServiceValidationError
+
+    async def capture_system_status(call) -> None:
+        entry_id = call.data["config_entry_id"]
+        client = hass.data.get(DOMAIN, {}).get(entry_id)
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if not isinstance(client, PW200Client) or entry is None or entry.domain != DOMAIN:
+            raise ServiceValidationError("The selected Powertech entry is not loaded")
+        duration = call.data["duration"]
+        if duration == 0:
+            client.status_probe.cancel()
+            return
+        try:
+            client.status_probe.start(
+                lambda coroutine: entry.async_create_background_task(
+                    hass, coroutine, f"{DOMAIN}_{entry_id}_system_status_probe",
+                ),
+                hass.async_add_executor_job,
+                duration,
+            )
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+
+    hass.services.async_register(
+        DOMAIN, "capture_system_status", capture_system_status,
+        schema=vol.Schema({
+            vol.Required("config_entry_id"): str,
+            vol.Optional("duration", default=60): vol.All(vol.Coerce(int), vol.Range(min=0, max=90)),
+        }),
+    )
+    return True
 
 
 def _create_client(hass: HomeAssistant, entry: ConfigEntry) -> PW200Client:

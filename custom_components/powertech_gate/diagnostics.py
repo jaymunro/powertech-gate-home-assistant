@@ -70,4 +70,5 @@ async def async_get_config_entry_diagnostics(
         "config_entry": config_entry,
         "device": device,
         "feedback_capture": client.feedback_capture.snapshot(),
+        "system_status_probe": client.status_probe.snapshot(),
     }

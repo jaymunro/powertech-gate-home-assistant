@@ -143,6 +143,10 @@ class FeedbackCapture:
             state = "unavailable"
         self._append("cover", {"mode": mode, "state": state})
 
+    def record_status_request(self, accepted: bool) -> None:
+        """Timestamp an explicit RS publish without retaining its payload."""
+        self._append("status_request", {"accepted": bool(accepted)})
+
     def snapshot(self) -> dict:
         with self._lock:
             self._prune(time.monotonic())

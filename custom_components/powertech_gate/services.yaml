@@ -1,0 +1,24 @@
+capture_system_status:
+  name: Capture system status
+  description: >-
+    Read-only PS19001 diagnostic sampling. Sends RS at most once every two seconds,
+    stops on an unanswered request, and never sends movement commands.
+    Enable feedback capture first; download diagnostics after the test.
+  fields:
+    config_entry_id:
+      name: Integration entry
+      description: The loaded Powertech integration to sample.
+      required: true
+      selector:
+        config_entry:
+          integration: powertech_gate
+    duration:
+      name: Sampling duration
+      description: Seconds, up to 90. Use 0 to cancel a running capture.
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 90
+          step: 1
+          unit_of_measurement: s
