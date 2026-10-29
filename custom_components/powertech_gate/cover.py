@@ -127,6 +127,8 @@ class PowertechPW200Cover(
     def is_closed(
         self,
     ) -> bool | None:
+        if self._client.uses_position_feedback and self._client.state.position_received:
+            return self._client.state.position == 0
         state = (
             self._client.state.gate_state
         )
@@ -157,6 +159,8 @@ class PowertechPW200Cover(
 
     @property
     def is_opening(self) -> bool:
+        if self._client.uses_position_feedback and self._client.state.position_received:
+            return False
         return (
             self._client.state.gate_state
             in (
@@ -167,6 +171,8 @@ class PowertechPW200Cover(
 
     @property
     def is_closing(self) -> bool:
+        if self._client.uses_position_feedback and self._client.state.position_received:
+            return False
         return (
             self._client.state.gate_state
             == STATE_CLOSING
@@ -232,10 +238,19 @@ class PowertechPW200PedestrianCover(
         """Return pedestrian gate state.
 
         PS20088D may acknowledge PED OPEN / PED CLOSE without immediately
-        publishing a fresh RS/shadow state. Prefer those explicit ACKs before
+        publishing a fresh RS/shadow state. PS19001 uses observed position
+        events to supersede an opening ACK. Other models prefer explicit ACKs before
         falling back to the shared gate state/position.
         """
-        last_ack = self._client.state.last_ack or ""
+        if self._client.uses_position_feedback:
+            if self._client.state.pedestrian_open_pending:
+                return False
+            if self._client.state.position_received:
+                return self._client.state.position == 0
+            # Keep legacy ACK fallback confined to the models that need it.
+            last_ack = ""
+        else:
+            last_ack = self._client.state.last_ack or ""
 
         if last_ack.startswith("ACK PED OPEN"):
             return False
@@ -268,6 +283,8 @@ class PowertechPW200PedestrianCover(
 
     @property
     def is_opening(self) -> bool:
+        if self._client.uses_position_feedback and self._client.state.position_received:
+            return False
         return (
             self._client.state.gate_state
             == STATE_PARTIAL_OPENING
@@ -275,6 +292,8 @@ class PowertechPW200PedestrianCover(
 
     @property
     def is_closing(self) -> bool:
+        if self._client.uses_position_feedback and self._client.state.position_received:
+            return False
         return (
             self._client.state.gate_state
             == STATE_CLOSING

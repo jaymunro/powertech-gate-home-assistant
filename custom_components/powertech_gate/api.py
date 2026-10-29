@@ -46,6 +46,10 @@ class PW200State:
     device_info: str | None = None
     raw_status: str | None = None
     last_ack: str | None = None
+    # PS19001 shadow status does not reliably represent movement. Keep the
+    # event-based position separate from shadow-derived endpoint estimates.
+    position_received: bool = False
+    pedestrian_open_pending: bool = False
 
 
 class PW200Client:
@@ -196,6 +200,11 @@ class PW200Client:
         if self.device_type:
             return self.device_type
         return "WBT01"
+
+    @property
+    def uses_position_feedback(self) -> bool:
+        """Use the validated position stream for PS19001 cover feedback."""
+        return self.display_model == "PS19001"
 
     @property
     def display_name(self) -> str:
@@ -757,6 +766,12 @@ class PW200Client:
             self.state = replace(
                 self.state,
                 last_ack=payload,
+                pedestrian_open_pending=(
+                    True if self.uses_position_feedback
+                    and not getattr(msg, "retain", False)
+                    and payload.split(";", 1)[0].strip() == "ACK PED OPEN"
+                    else self.state.pedestrian_open_pending
+                ),
             )
             self._notify()
             return
@@ -772,17 +787,10 @@ class PW200Client:
             )
 
             try:
-                position = max(
-                    0,
-                    min(
-                        100,
-                        int(
-                            payload.strip().replace(
-                                "%",
-                                "",
-                            )
-                        ),
-                    ),
+                value = payload.strip()
+                position = int(
+                    value.removesuffix("%") if self.uses_position_feedback
+                    else value.replace("%", "")
                 )
             except ValueError:
                 _LOGGER.warning(
@@ -790,9 +798,19 @@ class PW200Client:
                 )
                 return
 
+            if self.uses_position_feedback and (
+                not 0 <= position <= 100 or getattr(msg, "retain", False)
+            ):
+                # Retained values have no timestamp and cannot supersede a
+                # live observation or a just-acknowledged command.
+                return
+            position = max(0, min(100, position))
+
             self.state = replace(
                 self.state,
                 position=position,
+                position_received=True,
+                pedestrian_open_pending=False,
             )
             self._notify()
             return
@@ -860,12 +878,14 @@ class PW200Client:
 
             # Position topic is event based, so force
             # known physical end positions.
-            if gate_state == STATE_CLOSED:
+            preserve_position = self.uses_position_feedback and self.state.position_received
+            if gate_state == STATE_CLOSED and not preserve_position:
                 position = 0
-            elif gate_state == STATE_OPEN:
+            elif gate_state == STATE_OPEN and not preserve_position:
                 position = 100
 
-        self.state = PW200State(
+        self.state = replace(
+            self.state,
             gate_state=gate_state,
             position=position,
             online=reported.get(

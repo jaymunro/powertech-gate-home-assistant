@@ -45,6 +45,7 @@ async def async_setup_entry(
             PowertechPW200MacAddressSensor(
                 client
             ),
+            PowertechPositionSensor(client),
         ],
         True,
     )
@@ -137,3 +138,19 @@ class PowertechPW200MacAddressSensor(
         return format_mac(
             self._client.state.wifi_mac
         )
+
+
+class PowertechPositionSensor(_PW200DiagnosticSensor):
+    """Controller travel value, not a separate percentage for each leaf."""
+
+    _attr_translation_key = "position"
+    _attr_native_unit_of_measurement = "%"
+    _attr_icon = "mdi:gate"
+
+    def __init__(self, client: PW200Client) -> None:
+        super().__init__(client)
+        self._attr_unique_id = f"{client.thing_id}_position"
+
+    @property
+    def native_value(self) -> int | None:
+        return self._client.state.position if self._client.state.position_received else None
