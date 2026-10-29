@@ -5,6 +5,15 @@ capture_system_status:
     stops on an unanswered request, and never sends movement commands.
     Enable feedback capture first; download diagnostics after the test.
   fields:
+    protocol:
+      name: Status protocol
+      description: Auto follows reported UART version. RS is a one-request compatibility check and requires duration 1.
+      default: auto
+      selector:
+        select:
+          options:
+            - auto
+            - rs
     include_shadow:
       name: Include raw status snapshots
       description: Also request the AWS shadow each sample. Stored data may be stale; compare version and timestamps in diagnostics.

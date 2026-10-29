@@ -6,7 +6,7 @@ import asyncio
 import time
 
 INTERVAL_SECONDS = 2.0
-RESPONSE_TIMEOUT_SECONDS = 3.0
+RESPONSE_TIMEOUT_SECONDS = 8.0
 MAX_DURATION_SECONDS = 90
 
 
@@ -26,7 +26,7 @@ class SystemStatusProbe:
     def running(self) -> bool:
         return self.task is not None and not self.task.done()
 
-    def start(self, create_task, executor, duration: int, include_shadow: bool = False) -> None:
+    def start(self, create_task, executor, duration: int, include_shadow: bool = False, protocol: str = "auto") -> None:
         if self.running:
             raise ValueError("A system-status capture is already running")
         if not self.client.uses_position_feedback:
@@ -37,9 +37,13 @@ class SystemStatusProbe:
             raise ValueError("The controller is disconnected")
         if type(duration) is not int or not 1 <= duration <= MAX_DURATION_SECONDS:
             raise ValueError("Duration must be between 1 and 90 seconds")
+        if protocol not in ("auto", "rs"):
+            raise ValueError("Protocol must be auto or rs")
+        if protocol == "rs" and duration != 1:
+            raise ValueError("The explicit RS check must use duration 1")
         self.requests = self.responses = 0
         self.finish_reason = "running"
-        self.task = create_task(self._run(executor, duration, include_shadow))
+        self.task = create_task(self._run(executor, duration, include_shadow, protocol))
 
     def cancel(self) -> None:
         if self.running:
@@ -50,7 +54,7 @@ class SystemStatusProbe:
         return {"running": self.running, "requests": self.requests,
                 "responses": self.responses, "finish_reason": self.finish_reason}
 
-    async def _run(self, executor, duration: int, include_shadow: bool) -> None:
+    async def _run(self, executor, duration: int, include_shadow: bool, protocol: str) -> None:
         deadline = self._clock() + duration
         try:
             while self._clock() < deadline:
@@ -62,7 +66,10 @@ class SystemStatusProbe:
                 if include_shadow and not await executor(self.client.request_shadow):
                     self.finish_reason = "shadow_publish_unavailable"
                     return
-                if not await executor(self.client.request_fresh_system_status):
+                request = self.client.request_fresh_system_status
+                if protocol == "rs":
+                    request = lambda: self.client.request_fresh_system_status(force_rs=True)
+                if not await executor(request):
                     self.finish_reason = "publish_unavailable"
                     return
                 self.requests += 1
@@ -78,6 +85,8 @@ class SystemStatusProbe:
                         return
                     await self._sleep(0.1)
                 self.responses += self.client.system_status_generation - before
+                if protocol == "rs":
+                    break
                 if self._clock() >= deadline:
                     break
                 await self._sleep(min(max(0, INTERVAL_SECONDS - (self._clock() - sent_at)),

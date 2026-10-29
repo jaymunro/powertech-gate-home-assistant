@@ -496,7 +496,7 @@ class PW200Client:
         with self._shadow_lock:
             return self._system_status_generation
 
-    def request_fresh_system_status(self) -> bool:
+    def request_fresh_system_status(self, *, force_rs: bool = False) -> bool:
         """Publish the model's fixed read-only status command for a probe."""
         if not self.is_connected:
             return False
@@ -505,7 +505,7 @@ class PW200Client:
                 return False
         # EyeOpen maps reported UART 1 to its legacy protocol and selects
         # READ STATUS. Reported UART 2 selects RS instead.
-        command = "READ STATUS" if self.state.uart_version == 1 else "RS"
+        command = "RS" if force_rs or self.state.uart_version != 1 else "READ STATUS"
         info = self._mqtt.publish(
             self._topic_cmd_rx, payload=f"c={command};src={self.source_id}", qos=0,
         )
