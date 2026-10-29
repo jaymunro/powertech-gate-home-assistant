@@ -48,7 +48,7 @@ def safe_ack(value: object) -> dict:
         return {"ack": token}
     if token.startswith("ACK RS:"):
         return {"ack": "ACK RS", "status_bytes": safe_status(token[7:])}
-    match = re.fullmatch(r"ACK STATUS:(?P<status>(?:PED |FULL )?(?:CLOSED|OPEN|OPENED|OPENING|CLOSING|CLOSEING|STOPPED)),(?P<position>\d{1,3})", token)
+    match = re.fullmatch(r"ACK STATUS:(?P<status>(?:PED |FULL |SINGLE )?(?:CLOSED|OPEN|OPENED|OPENING|CLOSING|CLOSEING|STOPPED)),(?P<position>\d{1,3})", token)
     if match:
         return {"ack": "ACK STATUS", "status": match["status"],
                 "status_position": int(match["position"])}
