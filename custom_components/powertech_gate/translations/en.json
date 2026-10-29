@@ -100,7 +100,8 @@
         "description": "Configure non-essential integration behavior.",
         "data": {
           "refresh_interval": "Shadow refresh interval (seconds)",
-          "enable_debug_attributes": "Enable extra debug attributes"
+          "enable_debug_attributes": "Enable extra debug attributes",
+          "capture_feedback": "Capture gate feedback (last hour, up to 512 events)"
         }
       }
     }

@@ -100,7 +100,8 @@
         "description": "Az integráció opcionális működési beállításai.",
         "data": {
           "refresh_interval": "Shadow frissítési időköz (másodperc)",
-          "enable_debug_attributes": "Extra hibakeresési attribútumok engedélyezése"
+          "enable_debug_attributes": "Extra hibakeresési attribútumok engedélyezése",
+          "capture_feedback": "Kapu-visszajelzések rögzítése (utolsó óra, legfeljebb 512 esemény)"
         }
       }
     }
