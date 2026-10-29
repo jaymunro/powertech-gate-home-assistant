@@ -206,8 +206,11 @@ class BackgroundRefreshTests(unittest.IsolatedAsyncioTestCase):
         hass.data[domain] = {"entry-id": self.client}
         hass.config_entries.async_get_entry = lambda entry_id: self.entry if entry_id == "entry-id" else None
         await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id"})))
-        creator, executor, duration = starts[0]
+        creator, executor, duration, include_shadow = starts[0]
         self.assertEqual(duration, 60)
+        self.assertFalse(include_shadow)
+        await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id", "include_shadow": True})))
+        self.assertTrue(starts[-1][3])
         async def sample(): pass
         creator(sample())
         self.assertEqual(self.entry.background_tasks[-1][2], "powertech_gate_entry-id_system_status_probe")

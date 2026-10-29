@@ -43,8 +43,9 @@ class StatusProbeTests(unittest.IsolatedAsyncioTestCase):
         def publish(topic, payload, qos=0):
             self.publish_times.append(self.clock())
             result = original(topic, payload, qos)
-            receive(self.client, self.client._topic_cmd_tx,
-                    "ACK RS:00,00,20,1A,00,00,00,00,00;src=PRIVATE")
+            if topic == self.client._topic_cmd_rx:
+                receive(self.client, self.client._topic_cmd_tx,
+                        "ACK RS:00,00,20,1A,00,00,00,00,00;src=PRIVATE")
             return result
         self.client._mqtt.publish = publish
 
@@ -65,6 +66,27 @@ class StatusProbeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(e["kind"] == "status_request" for e in events), 45)
         self.assertNotIn("PRIVATE", str(events))
         self.assertIsNone(self.client.state.position)
+
+    async def test_optional_shadow_reads_are_fixed_and_bounded_with_status_reads(self):
+        self.respond_to_reads()
+        self.client._shadow_subscribed.set()
+        self.probe.start(asyncio.create_task, self.executor, 5, True)
+        await self.probe.task
+        self.assertEqual(self.probe.requests, 3)
+        self.assertEqual(self.probe.responses, 3)
+        self.assertEqual(self.probe.finish_reason, "window_complete")
+        self.assertEqual(self.client._mqtt.published, [
+            item for _ in range(3) for item in (
+                (self.client._topic_shadow_get, "{}", 0),
+                (self.client._topic_cmd_rx, "c=RS;src=private-source", 0),
+            )
+        ])
+
+    async def test_unavailable_shadow_stops_before_status_command(self):
+        self.probe.start(asyncio.create_task, self.executor, 5, True)
+        await self.probe.task
+        self.assertEqual(self.probe.finish_reason, "shadow_publish_unavailable")
+        self.assertEqual(self.client._mqtt.published, [])
 
     async def test_no_reply_stops_after_one_request(self):
         self.probe.start(asyncio.create_task, self.executor, 60)
