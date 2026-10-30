@@ -14,6 +14,7 @@ import uuid
 
 import paho.mqtt.client as mqtt
 
+from .input_capture import InputMessageCapture
 from .feedback_capture import FeedbackCapture, safe_ack
 from .status_probe import SystemStatusProbe
 from .status_feedback import StatusPoller
@@ -86,6 +87,7 @@ class PW200Client:
 
         self.state = PW200State()
         self.feedback_capture = FeedbackCapture()
+        self.input_capture = InputMessageCapture(source_id, thing_id)
         self.status_probe = SystemStatusProbe(self)
         self.status_poller = StatusPoller(self)
         self.status_feedback_enabled = False
@@ -774,6 +776,21 @@ class PW200Client:
 
     def _on_message(self, client, userdata, msg) -> None:
         """Preserve message handling and observe only allowlisted feedback."""
+        try:
+            kind = {
+                self._topic_cmd_tx: "command_ack",
+                self._topic_position: "position",
+                self._topic_shadow_ok: "shadow_get",
+                self._topic_shadow_update: "shadow_update",
+                self._topic_shadow_err: "shadow_rejected",
+            }.get(msg.topic)
+            if kind is not None:
+                self.input_capture.record(
+                    kind, msg.payload, retained=getattr(msg, "retain", False),
+                    duplicate=getattr(msg, "dup", False),
+                )
+        except Exception:
+            _LOGGER.debug("Powertech input capture could not record a message")
         self._handle_message(client, userdata, msg)
         if not self.feedback_capture.enabled:
             return
@@ -807,7 +824,7 @@ class PW200Client:
             with self._shadow_lock:
                 self._passive_command_ack_messages += 1
                 command_ack_count = self._passive_command_ack_messages
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Powertech passive MQTT activity observed; "
                 "topic_kind=command_ack count=%d",
                 command_ack_count,
@@ -868,7 +885,7 @@ class PW200Client:
             with self._shadow_lock:
                 self._passive_position_messages += 1
                 position_count = self._passive_position_messages
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Powertech passive MQTT activity observed; "
                 "topic_kind=position count=%d",
                 position_count,

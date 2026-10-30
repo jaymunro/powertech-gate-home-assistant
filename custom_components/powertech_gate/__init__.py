@@ -73,6 +73,19 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vol.Optional("protocol", default="auto"): vol.In(["auto", "rs"]),
         }),
     )
+    async def capture_input_messages(call) -> None:
+        client = hass.data.get(DOMAIN, {}).get(call.data["config_entry_id"])
+        if not isinstance(client, PW200Client):
+            raise ServiceValidationError("The selected Powertech entry is not loaded")
+        client.input_capture.start(call.data["duration"])
+
+    hass.services.async_register(
+        DOMAIN, "capture_input_messages", capture_input_messages,
+        schema=vol.Schema({
+            vol.Required("config_entry_id"): str,
+            vol.Optional("duration", default=180): vol.All(vol.Coerce(int), vol.Range(min=0, max=180)),
+        }),
+    )
     return True
 
 

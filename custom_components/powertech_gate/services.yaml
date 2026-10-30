@@ -37,3 +37,20 @@ capture_system_status:
           max: 90
           step: 1
           unit_of_measurement: s
+
+capture_input_messages:
+  name: Capture input messages
+  description: Record received messages for a bounded private diagnostic window. Sends no commands. Export may contain unknown private data; do not publish it.
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: powertech_gate
+    duration:
+      default: 180
+      selector:
+        number:
+          min: 0
+          max: 180
+          unit_of_measurement: s

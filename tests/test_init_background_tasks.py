@@ -226,3 +226,26 @@ class BackgroundRefreshTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cancelled, [True])
         with self.assertRaisesRegex(RuntimeError, "not loaded"):
             await handler(types.SimpleNamespace(data=schema({"config_entry_id": "missing"})))
+
+    async def test_input_capture_action_is_bounded_and_only_arms_capture(self):
+        import voluptuous as vol
+        hass = FakeHass()
+        registrations = []
+        hass.services = types.SimpleNamespace(async_register=lambda *a, **kw: registrations.append((a, kw)))
+        await self.integration.async_setup(hass, {})
+        (domain, action, handler), kwargs = registrations[1]
+        self.assertEqual((domain, action), ("powertech_gate", "capture_input_messages"))
+        schema = kwargs["schema"]
+        for invalid in ({}, {"config_entry_id": "entry-id", "duration": 181},
+                        {"config_entry_id": "entry-id", "command": "FULL OPEN"}):
+            with self.assertRaises(vol.Invalid): schema(invalid)
+        starts = []
+        self.client.input_capture = types.SimpleNamespace(start=starts.append)
+        self.integration.PW200Client = FakeClient
+        hass.data[domain] = {"entry-id": self.client}
+        await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id"})))
+        await handler(types.SimpleNamespace(data=schema({"config_entry_id": "entry-id", "duration": 0})))
+        self.assertEqual(starts, [180, 0])
+        self.assertEqual(self.entry.background_tasks, [])
+        with self.assertRaisesRegex(RuntimeError, "not loaded"):
+            await handler(types.SimpleNamespace(data=schema({"config_entry_id": "missing"})))
