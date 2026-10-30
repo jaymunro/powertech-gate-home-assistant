@@ -39,7 +39,21 @@ left and right leaves:
 | Stale or disconnected | unavailable | unavailable |
 
 A closed car-mode cover does not mean the whole gateway is physically shut.
-Use the `physical_gate_closed` attribute for that distinction; it is unknown
+Use the **Physical gate closed** binary sensor for that distinction. It is
+enabled by default for PS19001 / UART 1, including when UART metadata arrives
+after startup. Its unique ID ends in `_physical_gate_closed`. **On** confirms
+closure from fresh controller feedback; **off** means the gateway is not closed,
+including pedestrian opening, full opening and motion before the mode is known.
+It becomes **unavailable** on disconnection or expired feedback, rather than
+retaining a misleading confirmed-closed value. It has no opening device class
+because that class uses the opposite polarity (on = open).
+
+Security conditions must require this sensor to be explicitly **on**; unknown
+or unavailable is not confirmation of closure. This remains cloud controller
+feedback, with the same polling delay and freshness bounds as the covers; it
+is not a new physical contact sensor or an immediate alarm-grade signal.
+
+The existing `physical_gate_closed` cover attribute is preserved and is unknown
 when feedback is stale. Cover attributes also expose `representation`,
 `opening_mode`, `physical_gate_state`, `controller_status`, `status_position`
 and `feedback_source`.

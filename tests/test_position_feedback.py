@@ -31,6 +31,7 @@ def load_entities(filename):
     """Stub HA's entity scaffolding only; exercise the actual entity properties."""
     modules = {}
     for name in ("homeassistant", "homeassistant.components", "homeassistant.components.cover",
+                 "homeassistant.components.binary_sensor",
                  "homeassistant.components.sensor", "homeassistant.config_entries",
                  "homeassistant.const", "homeassistant.core", "homeassistant.helpers",
                  "homeassistant.helpers.device_registry", "homeassistant.helpers.entity_platform",
@@ -41,6 +42,7 @@ def load_entities(filename):
     cover.CoverDeviceClass = types.SimpleNamespace(GATE="gate")
     cover.CoverEntityFeature = types.SimpleNamespace(OPEN=1, CLOSE=2, STOP=4)
     modules["homeassistant.components.sensor"].SensorEntity = object
+    modules["homeassistant.components.binary_sensor"].BinarySensorEntity = object
     modules["homeassistant.config_entries"].ConfigEntry = object
     modules["homeassistant.core"].HomeAssistant = object
     modules["homeassistant.core"].callback = lambda func: func
