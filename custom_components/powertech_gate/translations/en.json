@@ -94,6 +94,11 @@
       "position": {
         "name": "Controller position"
       }
+    },
+    "binary_sensor": {
+      "physical_gate_closed": {
+        "name": "Physical gate closed"
+      }
     }
   },
   "options": {

@@ -36,7 +36,7 @@ def _load_integration():
     sys.modules["homeassistant.config_entries"] = config_entries
 
     const = types.ModuleType("homeassistant.const")
-    const.Platform = types.SimpleNamespace(COVER="cover", SENSOR="sensor")
+    const.Platform = types.SimpleNamespace(COVER="cover", SENSOR="sensor", BINARY_SENSOR="binary_sensor")
     sys.modules["homeassistant.const"] = const
 
     exceptions = types.ModuleType("homeassistant.exceptions")

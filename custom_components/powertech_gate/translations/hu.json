@@ -94,6 +94,11 @@
       "position": {
         "name": "Vezérlő pozíciója"
       }
+    },
+    "binary_sensor": {
+      "physical_gate_closed": {
+        "name": "Fizikai kapu zárva"
+      }
     }
   },
   "options": {
