@@ -19,7 +19,7 @@ class PhysicalGateClosedTests(unittest.TestCase):
         self.client.state.uart_version = 1
         self.client.status_feedback_enabled = True
         self.client._connected.set()
-        self.entity = binary_sensor.PowertechPhysicalGateClosedSensor(self.client)
+        self.entity = binary_sensor.PowertechGateStateSensor(self.client)
 
     def status(self, text, value):
         receive(self.client, self.client._topic_cmd_tx, f"ACK STATUS:{text},{value}")
@@ -31,18 +31,18 @@ class PhysicalGateClosedTests(unittest.TestCase):
             for reply in cycle["replies"]:
                 self.status(reply["status"], reply["position"])
                 self.assertTrue(self.entity.available)
-                self.assertEqual(self.entity.is_on, reply["status"].endswith("CLOSED"))
-            self.assertTrue(self.entity.is_on)
+                self.assertEqual(self.entity.is_on, not reply["status"].endswith("CLOSED"))
+            self.assertFalse(self.entity.is_on)
             self.assertEqual(self.client._mqtt.published, [])
 
     def test_unknown_mode_and_closing_zero_are_not_confirmed_closed(self):
         self.status("PED OPENING", 0)
         self.assertEqual(self.client.state.opening_mode, "unknown")
-        self.assertFalse(self.entity.is_on)
-        self.status("PED CLOSING", 0)
-        self.assertFalse(self.entity.is_on)
-        self.status("PED CLOSED", 0)
         self.assertTrue(self.entity.is_on)
+        self.status("PED CLOSING", 0)
+        self.assertTrue(self.entity.is_on)
+        self.status("PED CLOSED", 0)
+        self.assertFalse(self.entity.is_on)
 
     def test_no_feedback_or_command_ack_does_not_confirm_closure(self):
         self.assertFalse(self.entity.available)
@@ -54,7 +54,7 @@ class PhysicalGateClosedTests(unittest.TestCase):
         with patch.object(api.time, "monotonic", return_value=100):
             self.status("PED CLOSED", 0)
         with patch.object(api.time, "monotonic", return_value=160):
-            self.assertTrue(self.entity.is_on)
+            self.assertFalse(self.entity.is_on)
         with patch.object(api.time, "monotonic", return_value=160.001):
             self.assertFalse(self.entity.available)
             self.assertIsNone(self.entity.is_on)
@@ -73,13 +73,13 @@ class PhysicalGateClosedTests(unittest.TestCase):
             topic=self.client._topic_cmd_tx, payload=b"ACK STATUS:PED CLOSED,0", retain=True))
         receive(self.client, self.client._topic_shadow_ok,
                 '{"state":{"reported":{"DEV STATUS":"00,00,10,00,00,00,00,00,00"}}}')
-        self.assertFalse(self.entity.is_on)
+        self.assertTrue(self.entity.is_on)
 
     def test_fresh_position_event_uses_existing_physical_feedback(self):
         receive(self.client, self.client._topic_position, "40")
-        self.assertFalse(self.entity.is_on)
-        receive(self.client, self.client._topic_position, "0")
         self.assertTrue(self.entity.is_on)
+        receive(self.client, self.client._topic_position, "0")
+        self.assertFalse(self.entity.is_on)
 
     def test_unsupported_model_or_uart_unavailable(self):
         self.status("PED CLOSED", 0)
@@ -105,6 +105,11 @@ class PhysicalGateClosedTests(unittest.TestCase):
         self.assertEqual(entities[0]._attr_unique_id, "test-thing_physical_gate_closed")
         removals[0]()
         self.assertEqual(listeners, [])
+
+    def test_opening_class_and_name_match_inverted_state(self):
+        self.assertEqual(self.entity._attr_device_class, "opening")
+        self.assertEqual(self.entity._attr_translation_key, "gate_state")
+        self.assertEqual(self.entity._attr_unique_id, "test-thing_physical_gate_closed")
 
     def test_other_model_has_no_entity(self):
         self.client.device_type = "PS20088D"

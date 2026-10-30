@@ -43,6 +43,7 @@ def load_entities(filename):
     cover.CoverEntityFeature = types.SimpleNamespace(OPEN=1, CLOSE=2, STOP=4)
     modules["homeassistant.components.sensor"].SensorEntity = object
     modules["homeassistant.components.binary_sensor"].BinarySensorEntity = object
+    modules["homeassistant.components.binary_sensor"].BinarySensorDeviceClass = types.SimpleNamespace(OPENING="opening")
     modules["homeassistant.config_entries"].ConfigEntry = object
     modules["homeassistant.core"].HomeAssistant = object
     modules["homeassistant.core"].callback = lambda func: func
@@ -181,6 +182,11 @@ class PositionFeedbackTests(unittest.TestCase):
         self.client.device_type = None
         self.client.state = replace(self.client.state, device_info="P190,PS19001,V0.1")
         self.assertTrue(self.client.uses_position_feedback)
+
+    def test_network_diagnostics_default_disabled_without_disabling_position(self):
+        for cls in (sensor.PowertechPW200IPAddressSensor, sensor.PowertechPW200MacAddressSensor):
+            self.assertFalse(cls(self.client)._attr_entity_registry_enabled_default)
+        self.assertTrue(getattr(self.position, "_attr_entity_registry_enabled_default", True))
 
     def test_disconnect_makes_both_covers_and_sensor_unavailable(self):
         self.client._connected.set()

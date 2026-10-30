@@ -96,8 +96,8 @@
       }
     },
     "binary_sensor": {
-      "physical_gate_closed": {
-        "name": "Physical gate closed"
+      "gate_state": {
+        "name": "Gate state"
       }
     }
   },

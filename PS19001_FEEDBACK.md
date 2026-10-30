@@ -39,19 +39,22 @@ left and right leaves:
 | Stale or disconnected | unavailable | unavailable |
 
 A closed car-mode cover does not mean the whole gateway is physically shut.
-Use the **Physical gate closed** binary sensor for that distinction. It is
-enabled by default for PS19001 / UART 1, including when UART metadata arrives
-after startup. Its unique ID ends in `_physical_gate_closed`. **On** confirms
-closure from fresh controller feedback; **off** means the gateway is not closed,
-including pedestrian opening, full opening and motion before the mode is known.
-It becomes **unavailable** on disconnection or expired feedback, rather than
-retaining a misleading confirmed-closed value. It has no opening device class
-because that class uses the opposite polarity (on = open).
+Use the **Gate state** binary sensor for that distinction. It is enabled by
+default for PS19001 / UART 1, including delayed UART metadata after startup.
+It uses the opening device class: **Open** (`on`) means the gateway is not
+closed, including pedestrian opening, full opening and motion before the mode
+is known. **Closed** (`off`) confirms closure from fresh controller feedback.
+It becomes **unavailable** on disconnection or expired feedback.
 
-Security conditions must require this sensor to be explicitly **on**; unknown
-or unavailable is not confirmation of closure. This remains cloud controller
-feedback, with the same polling delay and freshness bounds as the covers; it
-is not a new physical contact sensor or an immediate alarm-grade signal.
+Security conditions must require this sensor to be explicitly **off**; unknown
+or unavailable is not confirmation of closure. It uses the same cloud feedback,
+polling delay and freshness bounds as the covers, rather than a new contact
+sensor. During motion, Open means not fully closed.
+
+The fork-only b10 prototype used the opposite polarity (on = closed). Any
+condition targeting that prototype must be updated when upgrading to b11.
+Its internal unique ID is retained for registry continuity; the default display
+name for new installations is Gate state.
 
 The existing `physical_gate_closed` cover attribute is preserved and is unknown
 when feedback is stale. Cover attributes also expose `representation`,
@@ -63,6 +66,10 @@ identify the active mode. Classification uses stationary feedback. A short
 opening may reach its stationary state before the next idle poll. Interrupted
 or unusual cycles need further physical validation; no leaf positions are
 inferred from the single controller travel value.
+
+IP address and Wi-Fi MAC diagnostic entities are disabled by default. They can
+be enabled in the entity registry when needed; existing user preferences are
+preserved. The controller position sensor remains enabled by default.
 
 The diagnostic position sensor reports that raw travel value, not a normalized
 per-leaf percentage. Entity IDs of existing covers are preserved. The separate
