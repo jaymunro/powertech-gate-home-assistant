@@ -94,6 +94,7 @@ class _PW200DiagnosticSensor(
 class PowertechPW200IPAddressSensor(
     _PW200DiagnosticSensor
 ):
+    _attr_entity_registry_enabled_default = False
     _attr_translation_key = "ip_address"
     _attr_icon = "mdi:ip-network"
 
@@ -119,6 +120,7 @@ class PowertechPW200IPAddressSensor(
 class PowertechPW200MacAddressSensor(
     _PW200DiagnosticSensor
 ):
+    _attr_entity_registry_enabled_default = False
     _attr_translation_key = "wifi_mac"
     _attr_icon = "mdi:network-outline"
 

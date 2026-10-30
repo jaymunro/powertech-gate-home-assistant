@@ -1,8 +1,8 @@
-"""Whole-gateway physical closure, independent of cover access mode."""
+"""Whole-gateway opening state, independent of cover access mode."""
 
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -27,22 +27,19 @@ async def async_setup_entry(
         nonlocal added
         if not added and client.uses_access_mode_feedback:
             added = True
-            async_add_entities([PowertechPhysicalGateClosedSensor(client)])
+            async_add_entities([PowertechGateStateSensor(client)])
 
     entry.async_on_unload(client.add_listener(discover))
     discover()
 
 
-class PowertechPhysicalGateClosedSensor(BinarySensorEntity):
-    """On confirms closure; off means physically not closed, even in motion.
-
-    No opening device class: its on=open polarity would contradict this name.
-    This is an operational entity, enabled by default, rather than diagnostics.
-    """
+class PowertechGateStateSensor(BinarySensorEntity):
+    """Open when not closed, including motion; unavailable without fresh feedback."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
-    _attr_translation_key = "physical_gate_closed"
+    _attr_translation_key = "gate_state"
+    _attr_device_class = BinarySensorDeviceClass.OPENING
     _attr_icon = "mdi:gate"
 
     def __init__(self, client: PW200Client) -> None:
@@ -61,7 +58,8 @@ class PowertechPhysicalGateClosedSensor(BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        return self._client.physical_gate_closed if self.available else None
+        closed = self._client.physical_gate_closed if self.available else None
+        return None if closed is None else not closed
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

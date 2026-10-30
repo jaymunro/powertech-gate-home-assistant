@@ -1,26 +1,28 @@
-# Physical gate closed — 0.9.16b10
+# Gate state — 0.9.16b11
 
-Adds one operational binary sensor to the existing PS19001 / UART 1 device.
-Physical gate closed is on only when fresh controller feedback confirms
-closure; off means not closed, including movement and either access mode.
-It becomes unavailable when disconnected or feedback is older than the existing
-60-second freshness bound (on the next normal update). Unknown/unavailable
-must not be treated as confirmation of closure in a security condition.
+The operational binary sensor is named Gate state and uses the opening device
+class. Home Assistant displays Open (on), Closed (off), or Unavailable. Open
+means not closed, including motion and either access mode. Closed requires
+fresh controller feedback. Unknown/unavailable must not confirm closure.
 
-No opening device class is set, because its on=open polarity contradicts this
-sensor's on=closed name. It is enabled by default and uses the stable unique ID
-suffix _physical_gate_closed. Discovery also works if UART metadata arrives
-after startup. Existing cover IDs, attributes, modes, commands and polling
-intervals are unchanged. This is cloud controller feedback, not a new physical
-contact sensor. No history API login, event path or announcement changes.
+The b10 prototype used the opposite polarity (on=closed). Any condition written
+for that prototype must be changed to require off for closure. Before this
+update, the HA search found no automation/script/scene/helper consumer. The user
+explicitly requested renaming the unused entity ID to
+binary_sensor.gate_front_gates_gate_state. The internal unique ID is retained
+for registry continuity; rename the existing entity through the registry API.
+The display name is supplied by integration translation, not a user override.
 
-Validation: 76 offline tests pass, including the ten new closure entity tests;
-compilation and diff checks pass. Offline replay includes both access modes,
-unknown movement, closing at zero, stale/retained/invalid feedback, disconnection,
-startup without feedback and delayed discovery. No gate operation is needed to
-install this change. Runtime verification is separate from offline replay.
+PS19001/UART1 discovery, freshness/disconnection handling, cover IDs, attributes,
+modes, commands and polling intervals are unchanged. This is cloud controller
+feedback, not a new contact sensor. No history API, announcement or security
+changes. During movement Open means not fully closed.
 
-Install exact fork tag 0.9.16b10 through HACS, preserve the existing entry and
-options, then restart Home Assistant once. Verify the new entity and existing
-cover IDs; do not migrate security or announcements as part of this deployment.
-Rollback: download exact fork tag 0.9.16b9 and restart once.
+IP address and Wi-Fi MAC diagnostics now default to disabled; controller position
+remains enabled. Existing registry preferences are preserved by an upgrade.
+
+Validation: 78 diagnostic-build and 48 clean-PR tests, plus compilation/diff
+checks. No gate operation required; runtime verification is separate from replay.
+Install exact fork tag0.9.16b11 through HACS and restart once. Verify Gate state
+shows Closed for fresh PED CLOSED/0. Rollback exact tag0.9.16b10 and restart;
+rollback also restores b10's opposite polarity and original display name.
